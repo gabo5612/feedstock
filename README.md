@@ -1,0 +1,83 @@
+# crucible
+
+Plataforma **local-first** de riesgo de costo de insumos metálicos. Ingiere los precios
+crudos, los normaliza, deriva features, pronostica con backtest walk-forward honesto y lo
+sirve en vivo — **todo corriendo dentro de la planta**.
+
+**Lo que NO es:** un bot de trading. No promete ganarle al mercado. La afirmación
+defendible es *"acá está el error out-of-sample de cada modelo contra el baseline naive,
+medido y reproducible"*.
+
+## Estado: M1 de 6
+
+| Hito | | |
+|---|---|---|
+| **M0** | Docker + Timescale + pgvector | ✅ |
+| **M1** | Ingesta + backfill 10 años, 12 instrumentos | ✅ |
+| M2 | Features + **guard de fuga en CI** | ⬜ |
+| M3 | Backtest + baseline naive publicado primero | ⬜ |
+| M4 | ARIMA + LightGBM contra el baseline | ⬜ |
+| M5 | Anomalías + régimen + dashboard | ⬜ |
+| M6 | Ollama con citas + compose offline | ⬜ |
+
+## Levantar
+
+```bash
+docker-compose up -d                    # Timescale + pgvector en :5434
+python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/python scripts/backfill.py    # los 12 instrumentos, 10 años
+.venv/bin/python -m pytest
+```
+
+## Lo ingerido (medido el 2026-09-06)
+
+**30 302 filas · 12 instrumentos · 0 errores · 0 huecos · 2016-09 → 2026-09**
+
+Cada instrumento trae ~2 514 velas diarias en 10 años. Reingesta verificada idempotente:
+correr el backfill de nuevo sobre el mismo tramo inserta **0 filas**.
+
+## Dos cosas que sostienen todo lo demás
+
+### 1. `ZN=F` no es zinc
+
+Es el futuro del bono del Tesoro a 10 años, y Yahoo lo devuelve sin ningún error. Meterlo
+en un dataset de metales lo contaminaría **sin una sola señal de que algo anda mal**, y un
+modelo entrenado encima daría números perfectamente plausibles y perfectamente falsos.
+
+Por eso cada instrumento declara un `expect_name` que **tiene** que aparecer en el nombre
+que devuelve la fuente, y la verificación corre **antes de escribir una sola fila**:
+
+```
+zinc: el ticker 'ZN=F' devuelve '10-Year T-Note Futures,Dec-2026', que no contiene
+'Zinc'. NO se ingirio nada.
+```
+
+### 2. `range=max` miente en silencio
+
+`range=max&interval=1d` **no devuelve diario**: Yahoo lo submuestrea a mensual sin avisar.
+Verificado dos veces sobre el cobre:
+
+| petición | puntos en 10 años |
+|---|---|
+| `range=max&interval=1d` | **268** |
+| `period1`/`period2` paginado | **2 515** |
+
+Un backfill hecho con `range=max` produce un dataset que *parece* completo y no lo es. Por
+eso el adaptador pagina por tramos.
+
+## Arquitectura
+
+Cuatro capas, y la división no es cosmética:
+
+- **`raw`** — append-only y sagrada. PK `(source, symbol, interval, ts)` → reingesta
+  idempotente. Nunca se modifica.
+- **`core`** — normalizada, huecos marcados. Se **reconstruye** desde `raw`: si una
+  normalización resulta estar mal, se corrige sin volver a pedirle nada a la fuente —
+  que además puede haber cambiado o desaparecido.
+- **`feat`** — versionada. Dos predicciones solo son comparables si comparten
+  `feature_version`.
+- **`model`** — `run`, `prediction`, `metric`.
+
+La ingesta habla solo con `SourceAdapter`. Cambiar a un feed pago —o al LME real— es
+escribir una clase, no reescribir el sistema. Eso es lo que hace honesto usar la chart API
+de Yahoo, que es no oficial y sin contrato de servicio.
