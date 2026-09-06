@@ -78,6 +78,15 @@ Three decisions about reading, not about looks:
 - **Eight series is the ceiling**, because that is what the palette validates. A ninth
   colour is not invented: the selection is trimmed.
 
+## Demo
+
+`demo/` is this dashboard with the database exported into it: 12 instruments and 30 302
+daily bars, answering the app's own `/api/` calls from a static file. Series, statistics
+and correlations are recomputed in the browser from those bars, and the scenario panel
+stays interactive. `node demo/verify.mjs` diffs those computations against the backend's
+answers — 300/300 agree. Deploy with `cd demo && vercel --prod`. See
+[`demo/README.md`](demo/README.md).
+
 ## Running it
 
 ```bash
