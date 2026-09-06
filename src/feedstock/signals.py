@@ -23,7 +23,7 @@ from dataclasses import dataclass
 
 import psycopg
 
-DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
+DSN = os.environ.get("FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock")
 
 # Cut points over `pos_rango_252d`: where the close sits within the 52-week range.
 # Chosen as quintiles — not tuned to make the result look good — and that decision is taken

@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 import psycopg  # noqa: E402
 
-DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
+DSN = os.environ.get("FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock")
 
 
 def summary(cur) -> None:
@@ -68,7 +68,7 @@ def main(argv: list[str]) -> int:
                 summary(cur)
     except psycopg.OperationalError as exc:
         print(f"\nCould not connect to the database: {exc}")
-        print("Is it running?  cd crucible && docker-compose up -d\n")
+        print("Is it running?  cd feedstock && docker-compose up -d\n")
         return 2
     return 0
 

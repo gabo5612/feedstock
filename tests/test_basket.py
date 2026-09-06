@@ -2,7 +2,7 @@
 
 import pytest
 
-from crucible.units import UnitError, convert, price_unit
+from feedstock.units import UnitError, convert, price_unit
 
 
 def test_mass():

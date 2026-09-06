@@ -28,7 +28,7 @@ from .instruments import BY_SYMBOL, Instrument
 from .sources import SourceAdapter, SourceError
 
 DSN = os.environ.get(
-    "CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible"
+    "FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock"
 )
 
 

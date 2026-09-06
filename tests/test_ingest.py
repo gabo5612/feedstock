@@ -7,10 +7,10 @@ from datetime import datetime, timezone
 
 import pytest
 
-from crucible.ingest import VerificationError, verify_name
-from crucible.instruments import BY_SYMBOL, INSTRUMENTS, TRAPS, Instrument
-from crucible.sources.base import Bar, SourceError
-from crucible.sources.yahoo import YahooAdapter
+from feedstock.ingest import VerificationError, verify_name
+from feedstock.instruments import BY_SYMBOL, INSTRUMENTS, TRAPS, Instrument
+from feedstock.sources.base import Bar, SourceError
+from feedstock.sources.yahoo import YahooAdapter
 
 
 class FakeSource:

@@ -18,7 +18,7 @@ from dataclasses import dataclass
 
 import psycopg
 
-DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
+DSN = os.environ.get("FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock")
 TOL = 1e-9
 
 

@@ -1,4 +1,4 @@
--- crucible schema. Applied once, when the volume is initialised.
+-- feedstock schema. Applied once, when the volume is initialised.
 --
 -- The split into layers is not cosmetic: `raw` is append-only and sacred, and everything
 -- else is rebuilt from it. If a normalisation turns out to be wrong, it is corrected and

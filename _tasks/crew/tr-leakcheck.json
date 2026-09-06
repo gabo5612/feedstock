@@ -1,9 +1,9 @@
 {
   "id": "tr-leakcheck",
   "kind": "mechanical-edit",
-  "contract": "Traduce al INGLES todo el texto en espanol del archivo src/crucible/leakcheck.py.\n\nQUE TRADUCIR: el docstring del modulo, todos los docstrings de clases y funciones, todos los comentarios, y los strings de texto que ve un usuario.\n\nREGLA CRITICA — NO RENOMBRES NADA. Ni una clase, ni una funcion, ni una variable, ni un campo de dataclass, ni una clave de diccionario, ni una constante. Solo cambias TEXTO dentro de comillas y dentro de comentarios. Renombrar cualquier identificador rompe el codigo que lo importa desde otro archivo y el trabajo se rechaza automaticamente.\n\nTampoco toques: el SQL dentro de las triple comillas que se pasa a cur.execute, los nombres de columna, los imports, ni la logica.\n\nEl ingles tiene que ser natural y tecnico, no literal palabra por palabra. Los comentarios de este proyecto explican POR QUE algo se hace de una forma y no de otra, y casi siempre hay un bug real o una decision defendible detras: esa explicacion es lo mas valioso del archivo y tiene que sobrevivir la traduccion completa, sin resumirla.\n\nEnvolve las lineas a un maximo de 90 caracteres, como el resto del proyecto.\n\nNo agregues ni quites codigo. No cambies el comportamiento.",
+  "contract": "Traduce al INGLES todo el texto en espanol del archivo src/feedstock/leakcheck.py.\n\nQUE TRADUCIR: el docstring del modulo, todos los docstrings de clases y funciones, todos los comentarios, y los strings de texto que ve un usuario.\n\nREGLA CRITICA — NO RENOMBRES NADA. Ni una clase, ni una funcion, ni una variable, ni un campo de dataclass, ni una clave de diccionario, ni una constante. Solo cambias TEXTO dentro de comillas y dentro de comentarios. Renombrar cualquier identificador rompe el codigo que lo importa desde otro archivo y el trabajo se rechaza automaticamente.\n\nTampoco toques: el SQL dentro de las triple comillas que se pasa a cur.execute, los nombres de columna, los imports, ni la logica.\n\nEl ingles tiene que ser natural y tecnico, no literal palabra por palabra. Los comentarios de este proyecto explican POR QUE algo se hace de una forma y no de otra, y casi siempre hay un bug real o una decision defendible detras: esa explicacion es lo mas valioso del archivo y tiene que sobrevivir la traduccion completa, sin resumirla.\n\nEnvolve las lineas a un maximo de 90 caracteres, como el resto del proyecto.\n\nNo agregues ni quites codigo. No cambies el comportamiento.",
   "files": [
-    "src/crucible/leakcheck.py"
+    "src/feedstock/leakcheck.py"
   ],
   "creates": [],
   "mustNotTouch": [
@@ -15,8 +15,8 @@
     "el modulo importa y sus simbolos publicos siguen existiendo"
   ],
   "verify": [
-    ".venv/bin/python scripts/check_english.py src/crucible/leakcheck.py",
-    ".venv/bin/python -c \"import sys; sys.path.insert(0,'src'); from crucible.leakcheck import check, Leak; l=check('copper',muestras=6); assert isinstance(l,list); l2=check('copper',muestras=6,inyectar_fuga=True); assert l2; print('ok')\""
+    ".venv/bin/python scripts/check_english.py src/feedstock/leakcheck.py",
+    ".venv/bin/python -c \"import sys; sys.path.insert(0,'src'); from feedstock.leakcheck import check, Leak; l=check('copper',muestras=6); assert isinstance(l,list); l2=check('copper',muestras=6,inyectar_fuga=True); assert l2; print('ok')\""
   ],
   "maxAttempts": 3,
   "parallelSafe": false

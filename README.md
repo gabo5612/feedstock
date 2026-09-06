@@ -1,4 +1,4 @@
-# crucible
+# feedstock
 
 A **local-first** platform for input-cost risk in a metals plant. It ingests raw prices,
 normalises them, derives features, forecasts with an honest walk-forward backtest and
@@ -59,7 +59,7 @@ the evidence: a "very cheap" band with a negative edge is painted red.
 ## Dashboard
 
 ```bash
-.venv/bin/python -m uvicorn crucible.api.main:app --port 8090
+.venv/bin/python -m uvicorn feedstock.api.main:app --port 8090
 # open http://127.0.0.1:8090
 ```
 

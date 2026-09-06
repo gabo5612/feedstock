@@ -11,9 +11,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from crucible.ingest import backfill  # noqa: E402
-from crucible.instruments import INSTRUMENTS  # noqa: E402
-from crucible.sources import YahooAdapter  # noqa: E402
+from feedstock.ingest import backfill  # noqa: E402
+from feedstock.instruments import INSTRUMENTS  # noqa: E402
+from feedstock.sources import YahooAdapter  # noqa: E402
 
 
 def main(argv: list[str]) -> int:

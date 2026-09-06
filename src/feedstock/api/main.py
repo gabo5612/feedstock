@@ -15,10 +15,10 @@ import psycopg
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 
-DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
+DSN = os.environ.get("FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock")
 WEB = Path(__file__).resolve().parent.parent / "web"
 
-app = FastAPI(title="crucible", docs_url="/api/docs")
+app = FastAPI(title="feedstock", docs_url="/api/docs")
 
 
 def _conn() -> psycopg.Connection:

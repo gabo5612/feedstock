@@ -5,18 +5,18 @@ It needs the database up with features computed. Skipped if there are none.
 
 import pytest
 
-from crucible.leakcheck import check
-from crucible.signals import CORTES, clasificar
+from feedstock.leakcheck import check
+from feedstock.signals import CORTES, clasificar
 
 pytestmark = pytest.mark.skipif(
-    __import__("os").environ.get("CRUCIBLE_SKIP_DB") == "1", reason="no database"
+    __import__("os").environ.get("FEEDSTOCK_SKIP_DB") == "1", reason="no database"
 )
 
 
 def _has_data(symbol="copper") -> bool:
     try:
         import psycopg
-        from crucible.leakcheck import DSN
+        from feedstock.leakcheck import DSN
         with psycopg.connect(DSN, connect_timeout=3) as c, c.cursor() as cur:
             cur.execute("SELECT count(*) FROM feat.feature WHERE symbol=%s", (symbol,))
             return cur.fetchone()[0] > 1000

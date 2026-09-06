@@ -1,15 +1,18 @@
-# crucible — plataforma local-first de riesgo de costo de insumos metálicos
+# feedstock — plataforma local-first de riesgo de costo de insumos metálicos
 
 **Fecha:** 2026-09-02
 **Relación con el resto:** proyecto insignia del paso 2 de `~/Desktop/Gabo/CONTEXTO-AI-PORTFOLIO-CV.md` §7.
 **Decisiones tomadas:** encuadre = metales / costo de insumos · stack = Python + React.
+**Nombre:** *feedstock* = el término de industria para los insumos que compra la planta.
+Deja explícito que esto mide costo de insumos, no que opera mercados. Renombrado desde
+`crucible` el 2026-09-06.
 
 ---
 
 ## 0. Qué es, en una frase
 
 Una planta metalúrgica compra cobre, aluminio, oro, platino y energía. Su margen lo
-decide el costo de esos insumos. `crucible` ingiere los precios crudos, los normaliza,
+decide el costo de esos insumos. `feedstock` ingiere los precios crudos, los normaliza,
 deriva features, detecta anomalías y régimen, pronostica con **backtest walk-forward
 honesto**, y lo sirve en vivo — **todo corriendo dentro de la planta**.
 
@@ -262,11 +265,11 @@ Y sostiene el eje narrativo de §1: **los datos no salen de la máquina.**
 
 ### 🔑 Keys — dónde viven
 
-Las keys de **FRED** y **EIA v2** están en `crucible/.env`, que `.gitignore` excluye.
+Las keys de **FRED** y **EIA v2** están en `feedstock/.env`, que `.gitignore` excluye.
 Se leen con `os.environ["FRED_API_KEY"]` / `["EIA_API_KEY"]`, nunca hardcodeadas.
 
 > Estuvieron en texto plano en este mismo archivo hasta el 2026-09-06. Se movieron porque
-> este documento es material de handoff y acompañaría al repo si `crucible` se publica —
+> este documento es material de handoff y acompañaría al repo si `feedstock` se publica —
 > una key en un `.md` de portfolio es una filtración esperando la fecha. **Si el archivo
 > llegó a estar en algún commit o copia, revocá y regenerá las dos** en
 > fred.stlouisfed.org y eia.gov/opendata: es gratis y toma un minuto.

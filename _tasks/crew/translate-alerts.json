@@ -1,15 +1,15 @@
 {
   "id": "translate-alerts",
   "kind": "mechanical-edit",
-  "contract": "Traduce al INGLES todo el texto en espanol del archivo src/crucible/alerts.py.\n\nQUE TRADUCIR: el docstring del modulo, todos los docstrings de funciones y clases, todos los comentarios (lineas que empiezan con #), y los strings de texto que ve un usuario.\n\nQUE NO TOCAR, bajo ninguna circunstancia:\n1. Los nombres de funciones publicas: crear_regla, evaluar, historial, listar. Se quedan EXACTAMENTE como estan.\n2. Los nombres de campos de dataclass: rule_id, name, symbol, kind, threshold, value, estado, mensaje. Se quedan igual.\n3. Las claves de los diccionarios que se devuelven: 'id', 'name', 'target', 'kind', 'threshold', 'value', 'estado', 'mensaje'.\n4. Los valores de estado: 'disparada', 'ok', 'sin_datos'. Son identificadores, no texto.\n5. Las claves del diccionario TIPOS: price_above, price_below, z_above, z_below, pos_above, pos_below, vol_above. Y el segundo elemento de cada tupla (close, z_252d, pos_rango_252d, vol_20d) que son nombres de columna.\n6. Todo el SQL dentro de cur.execute(...). Ni una palabra.\n7. Los imports, la constante DSN, y la logica.\n\nSI traduci el PRIMER elemento de cada tupla del diccionario TIPOS, que es texto que se le muestra al usuario. Por ejemplo 'precio por encima de' pasa a 'price above', 'volatilidad anual sobre' pasa a 'annual volatility above'.\n\nEl ingles tiene que ser natural y tecnico, no una traduccion literal palabra por palabra. Manten el mismo tono explicativo: los comentarios explican POR QUE algo se hace de una forma, y esa explicacion tiene que sobrevivir la traduccion.\n\nNo agregues ni quites codigo. No cambies el comportamiento. El archivo tiene que seguir importando y funcionando igual.",
+  "contract": "Traduce al INGLES todo el texto en espanol del archivo src/feedstock/alerts.py.\n\nQUE TRADUCIR: el docstring del modulo, todos los docstrings de funciones y clases, todos los comentarios (lineas que empiezan con #), y los strings de texto que ve un usuario.\n\nQUE NO TOCAR, bajo ninguna circunstancia:\n1. Los nombres de funciones publicas: crear_regla, evaluar, historial, listar. Se quedan EXACTAMENTE como estan.\n2. Los nombres de campos de dataclass: rule_id, name, symbol, kind, threshold, value, estado, mensaje. Se quedan igual.\n3. Las claves de los diccionarios que se devuelven: 'id', 'name', 'target', 'kind', 'threshold', 'value', 'estado', 'mensaje'.\n4. Los valores de estado: 'disparada', 'ok', 'sin_datos'. Son identificadores, no texto.\n5. Las claves del diccionario TIPOS: price_above, price_below, z_above, z_below, pos_above, pos_below, vol_above. Y el segundo elemento de cada tupla (close, z_252d, pos_rango_252d, vol_20d) que son nombres de columna.\n6. Todo el SQL dentro de cur.execute(...). Ni una palabra.\n7. Los imports, la constante DSN, y la logica.\n\nSI traduci el PRIMER elemento de cada tupla del diccionario TIPOS, que es texto que se le muestra al usuario. Por ejemplo 'precio por encima de' pasa a 'price above', 'volatilidad anual sobre' pasa a 'annual volatility above'.\n\nEl ingles tiene que ser natural y tecnico, no una traduccion literal palabra por palabra. Manten el mismo tono explicativo: los comentarios explican POR QUE algo se hace de una forma, y esa explicacion tiene que sobrevivir la traduccion.\n\nNo agregues ni quites codigo. No cambies el comportamiento. El archivo tiene que seguir importando y funcionando igual.",
   "files": [
-    "src/crucible/alerts.py"
+    "src/feedstock/alerts.py"
   ],
   "creates": [],
   "mustNotTouch": [
     "tests/",
-    "src/crucible/quality.py",
-    "src/crucible/basket.py",
+    "src/feedstock/quality.py",
+    "src/feedstock/basket.py",
     "pyproject.toml",
     "scripts/check_english.py"
   ],
@@ -18,8 +18,8 @@
     "el modulo importa y conserva sus funciones publicas y las claves de TIPOS"
   ],
   "verify": [
-    ".venv/bin/python scripts/check_english.py src/crucible/alerts.py",
-    ".venv/bin/python -c \"import sys; sys.path.insert(0,'src'); import crucible.alerts as a; assert all(hasattr(a,n) for n in ('crear_regla','evaluar','historial','listar')); assert set(a.TIPOS)=={'price_above','price_below','z_above','z_below','pos_above','pos_below','vol_above'}; print('ok')\""
+    ".venv/bin/python scripts/check_english.py src/feedstock/alerts.py",
+    ".venv/bin/python -c \"import sys; sys.path.insert(0,'src'); import feedstock.alerts as a; assert all(hasattr(a,n) for n in ('crear_regla','evaluar','historial','listar')); assert set(a.TIPOS)=={'price_above','price_below','z_above','z_below','pos_above','pos_below','vol_above'}; print('ok')\""
   ],
   "maxAttempts": 3,
   "parallelSafe": false

@@ -1,4 +1,4 @@
-"""Data-quality monitor. The sibling of `assay` for price series.
+"""Data-quality monitor. The sibling of `groundcheck` for price series.
 
 The infrastructure to detect problems already existed — `is_gap`, `display_name_verified`,
 `ingested_at` — but **nobody was looking at it**. Bad data nobody looks at is worse than
@@ -32,7 +32,7 @@ from dataclasses import dataclass
 
 import psycopg
 
-DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
+DSN = os.environ.get("FEEDSTOCK_DSN", "postgresql://feedstock:feedstock@localhost:5434/feedstock")
 
 DIAS_FRESCURA = 5       # business days without update before alerting
 SIGMAS_SALTO = 8.0      # threshold to mark, not to judge
