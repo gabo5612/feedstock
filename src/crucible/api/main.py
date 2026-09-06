@@ -224,6 +224,27 @@ def basket_scenario(payload: dict) -> dict:
     return escenario(nombre, payload.get("shocks") or {})
 
 
+@app.get("/api/alerts")
+def alerts() -> list[dict]:
+    from ..alerts import listar
+
+    return listar()
+
+
+@app.get("/api/alerts/history")
+def alerts_history(limit: int = Query(40, ge=1, le=200)) -> list[dict]:
+    from ..alerts import historial
+
+    return historial(limite=limit)
+
+
+@app.get("/api/quality")
+def quality() -> dict:
+    from ..quality import revisar
+
+    return revisar()
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")

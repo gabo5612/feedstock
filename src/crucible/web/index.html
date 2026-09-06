@@ -18,7 +18,7 @@
   --grid:      #e6e3dd;
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-  --good: #0ca30c; --critical: #d03b3b;
+  --good: #0ca30c; --warning: #b8860b; --critical: #d03b3b;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -28,7 +28,7 @@
     --grid: #2b2b28;
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-    --good: #0ca30c; --critical: #d03b3b;
+    --good: #0ca30c; --warning: #fab219; --critical: #e05a5a;
   }
 }
 :root[data-theme="dark"] {
@@ -40,11 +40,32 @@
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --good: #0ca30c; --critical: #d03b3b;
 }
+/* Ritmo de 4px y escala tipográfica fija. Sin esto cada componente inventa su propio
+   espaciado y el conjunto se ve armado por partes. */
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+  --fs-xs: 11px; --fs-sm: 12.5px; --fs-md: 14px; --fs-lg: 17px; --fs-xl: 22px;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --ring: var(--s1);
+  --t: 180ms cubic-bezier(.2,.7,.3,1);   /* dentro de los 150–300ms recomendados */
+}
 * { box-sizing: border-box; }
 body {
   margin: 0; background: var(--surface-0); color: var(--text-1);
-  font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  font: var(--fs-md)/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+/* Números tabulares en TODO dato: sin esto las columnas bailan al actualizarse. */
+.px, .v, td, th, .axis, #esc-out { font-variant-numeric: tabular-nums; }
+
+/* Foco visible. Es el punto 1 de accesibilidad y no estaba: sin esto la interfaz es
+   inoperable con teclado. */
+:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--r-sm);
+}
+button, input, [role="button"] { cursor: pointer; }
+input[type="search"], input[type="range"] { cursor: auto; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 .wrap { display: grid; grid-template-columns: 290px 1fr; min-height: 100vh; }
 @media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } aside { border-right: 0 !important; } }
 
@@ -55,15 +76,26 @@ h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.01em; }
 .field { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
   background: var(--surface-2); color: var(--text-1); font: inherit; font-size: 13px; }
 .chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
-.chip { padding: 4px 9px; font-size: 11.5px; border-radius: 99px; cursor: pointer;
-  border: 1px solid var(--border); background: transparent; color: var(--text-2); }
+.chip { padding: 6px 12px; font-size: var(--fs-xs); border-radius: 99px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-2);
+  transition: background var(--t), color var(--t), border-color var(--t);
+  min-height: 30px; display: inline-flex; align-items: center; gap: 5px; }
+.chip:hover { background: var(--surface-2); color: var(--text-1); }
 .chip[aria-pressed="true"] { background: var(--text-1); color: var(--surface-1); border-color: var(--text-1); }
+.chip svg { width: 13px; height: 13px; }
 .rowlist { display: flex; flex-direction: column; gap: 2px; max-height: 62vh; overflow-y: auto; margin: 0 -6px; }
-.row { display: grid; grid-template-columns: 12px 1fr auto; gap: 9px; align-items: center;
-  padding: 7px 6px; border-radius: 7px; cursor: pointer; border: 0; background: none;
-  color: inherit; font: inherit; text-align: left; width: 100%; }
+.row { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center;
+  padding: var(--sp-2) var(--sp-2); border-radius: var(--r-sm); border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; width: 100%;
+  min-height: 44px;                     /* área táctil mínima */
+  transition: background var(--t); position: relative; }
 .row:hover { background: var(--surface-2); }
 .row[aria-pressed="true"] { background: var(--surface-2); }
+/* La selección no se indica solo por color: lleva una barra que se ve sin distinguir tonos. */
+.row[aria-pressed="true"]::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--text-1);
+}
 .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--border); }
 .nm { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nm small { display: block; color: var(--text-3); font-size: 10.5px; }
@@ -76,14 +108,35 @@ h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.01em; }
 main { padding: 18px 22px 40px; min-width: 0; }
 .bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
 .spacer { flex: 1; }
-.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
-  padding: 16px 18px; margin-bottom: 16px; }
-.card h2 { font-size: 13px; margin: 0 0 3px; font-weight: 600; }
-.card p.note { color: var(--text-3); font-size: 11.5px; margin: 0 0 14px; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: var(--sp-5); margin-bottom: var(--sp-4); }
+.card h2 { font-size: var(--fs-md); margin: 0 0 var(--sp-1); font-weight: 600;
+  letter-spacing: -.01em; display: flex; align-items: center; gap: var(--sp-2); }
+.card h2 svg { width: 15px; height: 15px; color: var(--text-3); flex: none; }
+.card p.note { color: var(--text-3); font-size: var(--fs-sm); margin: 0 0 var(--sp-4);
+  max-width: 82ch; line-height: 1.55; }
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
-.tile { background: var(--surface-2); border-radius: 9px; padding: 11px 13px; }
-.tile .k { color: var(--text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
-.tile .v { font-size: 19px; font-variant-numeric: tabular-nums; margin-top: 3px; letter-spacing: -.02em; }
+.tile { background: var(--surface-2); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid transparent; transition: border-color var(--fs-md); }
+.tile .k { color: var(--text-3); font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .05em; font-weight: 500; }
+.tile .v { font-size: var(--fs-xl); margin-top: var(--sp-1); letter-spacing: -.025em;
+  line-height: 1.2; }
+
+/* Estado: icono + texto, NUNCA solo color. Es la regla de no depender del color para
+   comunicar, y además sobrevive a una captura en blanco y negro. */
+.estado { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
+  font-weight: 500; }
+.estado svg { width: 14px; height: 14px; flex: none; }
+.estado.ok { color: var(--good); }
+.estado.warn { color: var(--warning); }
+.estado.crit { color: var(--critical); }
+.estado.mute { color: var(--text-3); }
+.lista-estado { display: flex; flex-direction: column; gap: var(--sp-1); }
+.lista-estado > div { display: grid; grid-template-columns: 150px 1fr; gap: var(--sp-4);
+  padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.lista-estado > div:last-child { border-bottom: 0; }
+.lista-estado .det { color: var(--text-2); font-size: var(--fs-sm); }
 .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12px; }
 .legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
 .legend i { width: 11px; height: 11px; border-radius: 3px; }
@@ -102,6 +155,21 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
   font-variant-numeric: tabular-nums; }
 </style>
 
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="i-chart"><path d="M3 3v18h18M7 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-basket"><path d="M3 8h18l-2 12H5L3 8zM8 8V5a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-timing"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-link"><path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-bell"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 01-3.4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></g>
+<g id="i-ok"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-warn"><path d="M12 3l9.5 16.5h-19L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v4M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-crit"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v6M12 16v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-mute"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-theme"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 000 16z" fill="currentColor"/></g>
+</defs></svg>
+
 <div class="wrap">
   <aside>
     <h1>crucible</h1>
@@ -117,11 +185,11 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
     <div class="bar">
       <div class="chips" id="rangos" style="margin:0"></div>
       <div class="spacer"></div>
-      <button class="chip" id="tema" aria-pressed="false">◐ tema</button>
+      <button class="chip" id="tema" aria-label="Cambiar entre claro y oscuro"><svg viewBox="0 0 24 24"><use href="#i-theme"/></svg>tema</button>
     </div>
 
     <div class="card">
-      <h2 id="t-cmp">Comparación indexada</h2>
+      <h2 id="t-cmp"</h2>
       <p class="note" id="n-cmp"></p>
       <div id="cmp"></div>
       <div class="legend" id="leg-cmp"></div>
@@ -139,7 +207,7 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
     </div>
 
     <div class="card" id="card-basket">
-      <h2>Tu costo unitario</h2>
+      <h2</h2>
       <p class="note" id="n-basket"></p>
       <div class="tiles" id="basket-tiles"></div>
       <div id="basket-chart" style="margin-top:16px"></div>
@@ -148,15 +216,30 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
     </div>
 
     <div class="card" id="card-signal">
-      <h2>¿Es buen momento para comprar?</h2>
+      <h2</h2>
       <p class="note">Dónde está el precio respecto de <strong>su propia historia</strong>,
         y —lo que importa— <strong>qué pasó después las veces anteriores que estuvo ahí</strong>,
         medido sobre 10 años. No es un pronóstico.</p>
       <div id="signal"></div>
     </div>
 
+    <div class="card" id="card-alerts">
+      <h2><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg>Alertas</h2>
+      <p class="note">Corren locales, sin servicio externo. Una regla que no se puede
+        evaluar dice <strong>sin datos</strong>, no «ok»: pintar en verde lo que no se pudo
+        medir da confianza donde no hay información.</p>
+      <div id="alerts"></div>
+    </div>
+
+    <div class="card" id="card-quality">
+      <h2><svg viewBox="0 0 24 24"><use href="#i-shield"/></svg>Calidad de los datos</h2>
+      <p class="note">Frescura, huecos, deriva de nombre y valores atípicos. Un dato malo
+        que nadie mira es peor que uno que falta: el que falta se nota, el malo se usa.</p>
+      <div id="quality"></div>
+    </div>
+
     <div class="card" id="card-corr">
-      <h2>Qué se mueve junto</h2>
+      <h2</h2>
       <p class="note">Correlación de <strong>retornos diarios</strong>, no de precios: dos
         series con tendencia dan correlación alta aunque no tengan relación. Si el cobre y
         la energía se mueven juntos, cubrir uno no cubre el otro.</p>
@@ -274,6 +357,8 @@ async function cargar() {
   detalle(SEL[0], ser.series[SEL[0]] || [], stats);
   senal(SEL[0]);
   canasta();
+  alertas();
+  calidad();
   if (SEL.length > 1) {
     correlacion(await (await fetch(`/api/correlation?${q}`)).json());
     document.getElementById('card-corr').style.display = '';
@@ -419,6 +504,41 @@ function detalle(sym, datos, st) {
     g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
   document.getElementById('precio').innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio de ${sym}">${g}</svg>`;
+}
+
+const ICO = { ok: 'i-ok', warn: 'i-warn', crit: 'i-crit', mute: 'i-mute' };
+const estadoHtml = (clase, texto) =>
+  `<span class="estado ${clase}"><svg viewBox="0 0 24 24"><use href="#${ICO[clase]}"/></svg>${texto}</span>`;
+
+async function alertas() {
+  const d = await (await fetch('/api/alerts')).json();
+  const c = document.getElementById('alerts');
+  if (!d.length) { c.innerHTML = '<div class="empty">Sin reglas configuradas.</div>'; return; }
+  const mapa = { disparada: ['crit', 'disparada'], ok: ['ok', 'tranquila'], sin_datos: ['mute', 'sin datos'] };
+  const dis = d.filter(x => x.estado === 'disparada').length;
+  c.innerHTML = `
+    <div style="margin-bottom:var(--sp-4)">${dis
+      ? estadoHtml('crit', `${dis} regla(s) disparada(s) de ${d.length}`)
+      : estadoHtml('ok', `las ${d.length} reglas están tranquilas`)}</div>
+    <div class="lista-estado">${d.map(x => {
+      const [cl, txt] = mapa[x.estado];
+      return `<div>${estadoHtml(cl, txt)}<span class="det"><strong>${x.name}</strong> — ${x.mensaje}</span></div>`;
+    }).join('')}</div>`;
+}
+
+async function calidad() {
+  const d = await (await fetch('/api/quality')).json();
+  const c = document.getElementById('quality');
+  const resumen = d.critical
+    ? estadoHtml('crit', `${d.critical} problema(s) crítico(s)`)
+    : d.warning ? estadoHtml('warn', `${d.warning} aviso(s), nada crítico`)
+                : estadoHtml('ok', `${d.instruments} instrumentos sin hallazgos`);
+  c.innerHTML = `
+    <div style="margin-bottom:var(--sp-4)">${resumen}</div>
+    ${d.findings.length ? `<div class="lista-estado">${d.findings.map(f =>
+      `<div>${estadoHtml(f.severidad === 'critical' ? 'crit' : 'warn', f.symbol)}
+        <span class="det">${f.detalle}</span></div>`).join('')}</div>`
+      : '<div class="empty">Sin hallazgos.</div>'}`;
 }
 
 /* Canasta: costo unitario, exposicion y escenario.
