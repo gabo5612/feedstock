@@ -1,0 +1,755 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>feedstock — input cost risk</title>
+<style>
+/* Paleta validada con el validador del metodo (8 slots categoricos, luz y oscuro).
+   El WARN de contraste en modo claro (aqua, amarillo, magenta bajo 3:1) se cubre con
+   etiquetas directas y la vista de tabla, que es el alivio que el metodo exige. */
+:root {
+  color-scheme: light;
+  --surface-0: #f4f3f0;
+  --surface-1: #fcfcfb;
+  --surface-2: #eceae5;
+  --border:    #dcd9d2;
+  --text-1:    #0b0b0b;
+  --text-2:    #52514e;
+  --text-3:    #86847d;
+  --grid:      #e6e3dd;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --good: #0ca30c; --warning: #b8860b; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #232322;
+    --border: #35342f; --text-1: #ffffff; --text-2: #c3c2b7; --text-3: #8b8a80;
+    --grid: #2b2b28;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --good: #0ca30c; --warning: #fab219; --critical: #e05a5a;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #232322;
+  --border: #35342f; --text-1: #ffffff; --text-2: #c3c2b7; --text-3: #8b8a80;
+  --grid: #2b2b28;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good: #0ca30c; --critical: #d03b3b;
+}
+/* 4px rhythm and a fixed type scale. Without this every component invents its own
+   spacing and the whole thing looks assembled from parts. */
+:root {
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
+  --fs-xs: 11px; --fs-sm: 12.5px; --fs-md: 14px; --fs-lg: 17px; --fs-xl: 22px;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px;
+  --ring: var(--s1);
+  --t: 180ms cubic-bezier(.2,.7,.3,1);   /* dentro de los 150–300ms recomendados */
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-1);
+  font: var(--fs-md)/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+/* Tabular figures on EVERY data value: without them columns jitter as they update. */
+.px, .v, td, th, .axis, #esc-out { font-variant-numeric: tabular-nums; }
+
+/* Foco visible. Es el punto 1 de accesibilidad y no estaba: sin esto la interfaz es
+   inoperable con teclado. */
+:focus-visible {
+  outline: 2px solid var(--ring); outline-offset: 2px; border-radius: var(--r-sm);
+}
+button, input, [role="button"] { cursor: pointer; }
+input[type="search"], input[type="range"] { cursor: auto; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.wrap { display: grid; grid-template-columns: 290px 1fr; min-height: 100vh; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } aside { border-right: 0 !important; } }
+
+/* ── lateral ─────────────────────────────────────────────────────────── */
+aside { background: var(--surface-1); border-right: 1px solid var(--border); padding: 18px 16px; }
+h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.01em; }
+.sub { color: var(--text-3); font-size: 12px; margin-bottom: 16px; }
+.field { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface-2); color: var(--text-1); font: inherit; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
+.chip { padding: 6px 12px; font-size: var(--fs-xs); border-radius: 99px;
+  border: 1px solid var(--border); background: transparent; color: var(--text-2);
+  transition: background var(--t), color var(--t), border-color var(--t);
+  min-height: 30px; display: inline-flex; align-items: center; gap: 5px; }
+.chip:hover { background: var(--surface-2); color: var(--text-1); }
+.chip[aria-pressed="true"] { background: var(--text-1); color: var(--surface-1); border-color: var(--text-1); }
+.chip svg { width: 13px; height: 13px; }
+.rowlist { display: flex; flex-direction: column; gap: 2px; max-height: 62vh; overflow-y: auto; margin: 0 -6px; }
+.row { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center;
+  padding: var(--sp-2) var(--sp-2); border-radius: var(--r-sm); border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; width: 100%;
+  min-height: 44px;                     /* minimum touch target */
+  transition: background var(--t); position: relative; }
+.row:hover { background: var(--surface-2); }
+.row[aria-pressed="true"] { background: var(--surface-2); }
+/* Selection is not signalled by colour alone: it carries a bar visible without hue. */
+.row[aria-pressed="true"]::before {
+  content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px;
+  border-radius: 0 3px 3px 0; background: var(--text-1);
+}
+.dot { width: 10px; height: 10px; border-radius: 3px; background: var(--border); }
+.nm { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm small { display: block; color: var(--text-3); font-size: 10.5px; }
+.px { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+.px small { display: block; font-size: 10.5px; }
+.up { color: var(--good); } .down { color: var(--critical); }
+.hint { color: var(--text-3); font-size: 11px; margin-top: 10px; }
+
+/* ── principal ───────────────────────────────────────────────────────── */
+main { padding: 18px 22px 40px; min-width: 0; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.spacer { flex: 1; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: var(--sp-5); margin-bottom: var(--sp-4); }
+.card h2 { font-size: var(--fs-md); margin: 0 0 var(--sp-1); font-weight: 600;
+  letter-spacing: -.01em; display: flex; align-items: center; gap: var(--sp-2); }
+.card h2 svg { width: 15px; height: 15px; color: var(--text-3); flex: none; }
+.card p.note { color: var(--text-3); font-size: var(--fs-sm); margin: 0 0 var(--sp-4);
+  max-width: 82ch; line-height: 1.55; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.tile { background: var(--surface-2); border-radius: var(--r-md); padding: var(--sp-3) var(--sp-4);
+  border: 1px solid transparent; transition: border-color var(--fs-md); }
+.tile .k { color: var(--text-3); font-size: 10.5px; text-transform: uppercase;
+  letter-spacing: .05em; font-weight: 500; }
+.tile .v { font-size: var(--fs-xl); margin-top: var(--sp-1); letter-spacing: -.025em;
+  line-height: 1.2; }
+
+/* State: icon + text, NEVER colour alone. This is the rule against relying on colour to
+   communicate, and it also survives a black-and-white screenshot. */
+.estado { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
+  font-weight: 500; }
+.estado svg { width: 14px; height: 14px; flex: none; }
+.estado.ok { color: var(--good); }
+.estado.warn { color: var(--warning); }
+.estado.crit { color: var(--critical); }
+.estado.mute { color: var(--text-3); }
+.lista-estado { display: flex; flex-direction: column; gap: var(--sp-1); }
+.lista-estado > div { display: grid; grid-template-columns: 150px 1fr; gap: var(--sp-4);
+  padding: var(--sp-2) 0; border-bottom: 1px solid var(--border); align-items: baseline; }
+.lista-estado > div:last-child { border-bottom: 0; }
+.lista-estado .det { color: var(--text-2); font-size: var(--fs-sm); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.axis { fill: var(--text-3); font-size: 10.5px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-3); font-weight: 500; font-size: 11px; }
+details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
+.empty { color: var(--text-3); padding: 34px 0; text-align: center; font-size: 13px; }
+#tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 11px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.14); z-index: 9;
+  font-variant-numeric: tabular-nums; }
+</style>
+
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+<g id="i-chart"><path d="M3 3v18h18M7 15l4-5 3 3 5-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-basket"><path d="M3 8h18l-2 12H5L3 8zM8 8V5a4 4 0 018 0v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-timing"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v5l3 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-link"><path d="M9 17H7A5 5 0 017 7h2M15 7h2a5 5 0 010 10h-2M8 12h8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-bell"><path d="M18 8a6 6 0 10-12 0c0 7-3 8-3 8h18s-3-1-3-8M13.7 21a2 2 0 01-3.4 0" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-shield"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/></g>
+<g id="i-ok"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></g>
+<g id="i-warn"><path d="M12 3l9.5 16.5h-19L12 3z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M12 9v4M12 16.5v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-crit"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 7v6M12 16v.01" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-mute"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2"/><path d="M8.5 12h7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></g>
+<g id="i-theme"><circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 000 16z" fill="currentColor"/></g>
+</defs></svg>
+
+<div class="wrap">
+  <aside>
+    <h1>feedstock</h1>
+    <div class="sub">input cost risk · local</div>
+
+    <input id="q" class="field" type="search" placeholder="Search instrument…" autocomplete="off">
+    <div class="chips" id="clases"></div>
+    <div class="rowlist" id="lista"></div>
+    <div class="hint" id="hint"></div>
+  </aside>
+
+  <main>
+    <div class="card" style="border-left:4px solid var(--acc,#4c8dff)">
+      <h2>Static demo</h2>
+      <p class="note">The real system runs <b>inside the plant</b>: an ingester, TimescaleDB and
+      an API. Vercel has none of that, so this copy carries <b>the real database exported</b> —
+      every daily bar, the signals, the basket and the data-quality report — and answers the
+      dashboard's own API calls from it. Series, statistics and correlations are
+      <b>recomputed in your browser</b> from those bars, ported from the SQL; a check
+      (<code>node verify.mjs</code>) diffs them against the backend's answers so the page cannot
+      show numbers the backend never produced. The window is anchored to the export date.</p>
+    </div>
+
+    <div class="bar">
+      <div class="chips" id="rangos" style="margin:0"></div>
+      <div class="spacer"></div>
+      <button class="chip" id="tema" aria-label="Toggle light and dark"><svg viewBox="0 0 24 24"><use href="#i-theme"/></svg>theme</button>
+    </div>
+
+    <div class="card">
+      <h2 id="t-cmp"><svg viewBox="0 0 24 24"><use href="#i-chart"/></svg>Indexed comparison</h2>
+      <p class="note" id="n-cmp"></p>
+      <div id="cmp"></div>
+      <div class="legend" id="leg-cmp"></div>
+      <details>
+        <summary>View the data as a table</summary>
+        <div id="tabla-cmp" style="margin-top:10px"></div>
+      </details>
+    </div>
+
+    <div class="card" id="card-stats">
+      <h2 id="t-stats">Detail</h2>
+      <p class="note" id="n-stats"></p>
+      <div class="tiles" id="tiles"></div>
+      <div id="precio" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card" id="card-basket">
+      <h2</h2>
+      <p class="note" id="n-basket"></p>
+      <div class="tiles" id="basket-tiles"></div>
+      <div id="basket-chart" style="margin-top:16px"></div>
+      <div id="basket-expo" style="margin-top:18px"></div>
+      <div id="basket-esc" style="margin-top:18px"></div>
+    </div>
+
+    <div class="card" id="card-signal">
+      <h2</h2>
+      <p class="note">Where the price sits relative to <strong>its own history</strong>, and
+        — what matters — <strong>what happened afterwards the previous times it sat
+        there</strong>, measured over 10 years. This is not a forecast.</p>
+      <div id="signal"></div>
+    </div>
+
+    <div class="card" id="card-alerts">
+      <h2><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg>Alerts</h2>
+      <p class="note">They run locally, with no external service. A rule that cannot be
+        evaluated says <strong>no data</strong>, not "ok": painting green over what could not
+        be measured gives confidence where there is no information.</p>
+      <div id="alerts"></div>
+    </div>
+
+    <div class="card" id="card-quality">
+      <h2><svg viewBox="0 0 24 24"><use href="#i-shield"/></svg>Data quality</h2>
+      <p class="note">Freshness, gaps, name drift and outliers. Bad data nobody looks at is
+        worse than missing data: the missing kind gets noticed, the bad kind gets used.</p>
+      <div id="quality"></div>
+    </div>
+
+    <div class="card" id="card-corr">
+      <h2</h2>
+      <p class="note">Correlation of <strong>daily returns</strong>, not prices: two trending
+        series correlate highly even when unrelated. If copper and energy move together,
+        hedging one does not hedge the other.</p>
+      <div id="corr"></div>
+    </div>
+  </main>
+</div>
+<div id="tip" role="status"></div>
+
+<script>
+/* Defers every /api/ call to the static export. Classic script on purpose: it has to be in
+   place before the dashboard's own script runs, while the data and the port load async. */
+(function () {
+  const data = fetch('./data.json').then(r => r.json());
+  const real = window.fetch.bind(window);
+  window.fetch = async (input, init) => {
+    const url = new URL(typeof input === 'string' ? input : input.url, location.origin);
+    if (!url.pathname.startsWith('/api/')) return real(input, init);
+    const [mod, d] = await Promise.all([import('./offline.js'), data]);
+    return mod.respond(d, url, init);
+  };
+})();
+</script>
+<script>
+const S = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (n, d = 2) => n == null ? '—' :
+  n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+/* Decimals by magnitude: a price of 6.68 needs three and one of 4477 needs none.
+   Fixing them at 3 makes 91.48 print as "91,480" and read as ninety-one thousand. */
+const dec = v => v == null ? 2 : Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 100 ? 1 : 2;
+const precio = v => fmt(v, dec(v));
+const el = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; };
+
+let INSTR = [], SEL = [], DIAS = 365, CLASE = null, Q = '';
+const RANGOS = [[90,'3M'],[365,'1A'],[1095,'3A'],[1825,'5A'],[3650,'10A']];
+
+/* ── carga ─────────────────────────────────────────────────────────── */
+async function init() {
+  try { INSTR = await (await fetch('/api/instruments')).json(); }
+  catch { document.getElementById('lista').innerHTML =
+    '<div class="empty">Could not load the exported dataset.</div>'; return; }
+
+  const clases = [...new Set(INSTR.map(i => i.asset_class))];
+  const cc = document.getElementById('clases');
+  cc.append(...clases.map(c => {
+    const b = el(`<button class="chip" aria-pressed="false">${c}</button>`);
+    b.onclick = () => { CLASE = CLASE === c ? null : c; pintarChips(); pintarLista(); };
+    b.dataset.clase = c; return b;
+  }));
+
+  const rr = document.getElementById('rangos');
+  rr.append(...RANGOS.map(([d, t]) => {
+    const b = el(`<button class="chip" aria-pressed="${d === DIAS}">${t}</button>`);
+    b.onclick = () => { DIAS = d; pintarChips(); cargar(); };
+    b.dataset.dias = d; return b;
+  }));
+
+  document.getElementById('q').oninput = e => { Q = e.target.value.toLowerCase(); pintarLista(); };
+  document.getElementById('tema').onclick = () => {
+    const oscuro = document.documentElement.dataset.theme === 'dark';
+    document.documentElement.dataset.theme = oscuro ? 'light' : 'dark';
+    cargar();
+  };
+
+  SEL = INSTR.filter(i => i.asset_class === 'metal').slice(0, 4).map(i => i.symbol);
+  pintarChips(); pintarLista(); cargar();
+}
+
+function pintarChips() {
+  document.querySelectorAll('#clases .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.clase === CLASE));
+  document.querySelectorAll('#rangos .chip').forEach(b =>
+    b.setAttribute('aria-pressed', +b.dataset.dias === DIAS));
+}
+
+function pintarLista() {
+  const cont = document.getElementById('lista');
+  const vis = INSTR.filter(i =>
+    (!CLASE || i.asset_class === CLASE) &&
+    (!Q || i.symbol.includes(Q) || (i.name || '').toLowerCase().includes(Q)));
+  cont.innerHTML = '';
+  if (!vis.length) { cont.append(el('<div class="empty">Nothing matches.</div>')); return; }
+
+  vis.forEach(i => {
+    const idx = SEL.indexOf(i.symbol);
+    const c = idx >= 0 ? css(S[idx % 8]) : 'var(--border)';
+    const ch = i.change_30d_pct;
+    const cls = ch == null ? '' : ch >= 0 ? 'up' : 'down';
+    const sig = ch == null ? '' : ch >= 0 ? '+' : '';
+    const b = el(`<button class="row" aria-pressed="${idx >= 0}">
+      <span class="dot" style="background:${c}"></span>
+      <span class="nm">${i.symbol}<small>${(i.name || '').slice(0, 26)}</small></span>
+      <span class="px">${precio(i.last)}
+        <small class="${cls}">${sig}${ch == null ? '—' : fmt(ch, 1) + '%'}</small></span>
+    </button>`);
+    b.onclick = () => alternar(i.symbol);
+    cont.append(b);
+  });
+  document.getElementById('hint').textContent =
+    `${SEL.length} of 8 selected · 30-day change`;
+}
+
+function alternar(sym) {
+  const i = SEL.indexOf(sym);
+  if (i >= 0) SEL.splice(i, 1);
+  else if (SEL.length < 8) SEL.push(sym);   // 8 = ceiling of the validated palette
+  else { document.getElementById('hint').textContent =
+    'Maximum 8: a ninth colour is not invented. Deselect one.'; return; }
+  pintarLista(); cargar();
+}
+
+/* ── datos y pintado ───────────────────────────────────────────────── */
+async function cargar() {
+  if (!SEL.length) {
+    document.getElementById('cmp').innerHTML = '<div class="empty">Pick at least one instrument.</div>';
+    document.getElementById('leg-cmp').innerHTML = '';
+    document.getElementById('tiles').innerHTML = '';
+    document.getElementById('precio').innerHTML = '';
+    document.getElementById('corr').innerHTML = '';
+    return;
+  }
+  const q = `symbols=${SEL.join(',')}&days=${DIAS}`;
+  const [ser, stats] = await Promise.all([
+    (await fetch(`/api/series?${q}`)).json(),
+    (await fetch(`/api/stats?symbol=${SEL[0]}&days=${DIAS}`)).json(),
+  ]);
+  lineas(ser.series);
+  detalle(SEL[0], ser.series[SEL[0]] || [], stats);
+  senal(SEL[0]);
+  canasta();
+  alertas();
+  calidad();
+  if (SEL.length > 1) {
+    correlacion(await (await fetch(`/api/correlation?${q}`)).json());
+    document.getElementById('card-corr').style.display = '';
+  } else document.getElementById('card-corr').style.display = 'none';
+}
+
+/* Comparison INDEXED to base 100.
+   Never two axes: copper trades near 6.7 USD/lb and gold near 4,400 USD/oz. Overlaying them
+   on different scales makes two lines cross because of how the chart was drawn, not because
+   of what the prices did. Indexing is the only honest reading of "which rose more". */
+function lineas(series) {
+  const cont = document.getElementById('cmp'), leg = document.getElementById('leg-cmp');
+  const syms = SEL.filter(s => (series[s] || []).length > 1);
+  document.getElementById('n-cmp').textContent =
+    `Every series starts at 100 on its first date in the period: the line shows percentage change, not price. ${syms.length>1?'It is the only honest way to compare instruments on different scales.':''}`;
+  if (!syms.length) { cont.innerHTML = '<div class="empty">No data in this range.</div>'; return; }
+
+  const W = 980, H = 340, P = { t: 14, r: 62, b: 26, l: 46 };
+  const norm = {}; let lo = Infinity, hi = -Infinity, fechas = [];
+  syms.forEach(s => {
+    const d = series[s], base = d[0][1];
+    norm[s] = d.map(([f, v]) => [f, v / base * 100]);
+    norm[s].forEach(([, v]) => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
+    if (d.length > fechas.length) fechas = d.map(([f]) => f);
+  });
+  const pad = (hi - lo) * .08 || 1; lo -= pad; hi += pad;
+  const n = fechas.length;
+  const X = i => P.l + i / Math.max(1, n - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+
+  let g = '';
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${v.toFixed(0)}</text>`;
+  }
+  const marcas = Math.min(6, n);
+  for (let k = 0; k < marcas; k++) {
+    const i = Math.round(k / (marcas - 1) * (n - 1));
+    g += `<text class="axis" x="${X(i)}" y="${H - 6}" text-anchor="middle">${fechas[i]?.slice(0, 7)}</text>`;
+  }
+  // Linea de base 100: la referencia de "sin cambio".
+  g += `<line class="gridline" x1="${P.l}" y1="${Y(100)}" x2="${W - P.r}" y2="${Y(100)}" stroke-dasharray="3 3"/>`;
+
+  syms.forEach((s, k) => {
+    const c = css(S[k % 8]), d = norm[s];
+    const path = d.map(([f, v], i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+    g += `<path d="${path}" fill="none" stroke="${c}" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+
+  // Direct labels: identity without relying on colour, and the relief the validator's
+  // contrast WARN requires in light mode. They separate vertically if two series
+  // end up adjacent — two overlapping names identify nothing.
+  const etiquetas = syms.map((s, k) => ({
+    s, c: css(S[k % 8]), y: Y(norm[s][norm[s].length - 1][1]), x: X(norm[s].length - 1) + 7,
+  })).sort((a, b) => a.y - b.y);
+  const MIN = 13;
+  for (let i = 1; i < etiquetas.length; i++)
+    if (etiquetas[i].y - etiquetas[i - 1].y < MIN) etiquetas[i].y = etiquetas[i - 1].y + MIN;
+  etiquetas.forEach(e => {
+    g += `<text x="${e.x}" y="${e.y + 3.5}" font-size="11" fill="${e.c}"
+            font-weight="600">${e.s.slice(0, 9)}</text>`;
+  });
+
+  cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Comparison indexed to base 100 for ${syms.join(', ')}">${g}
+    <rect id="cap" x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent"/>
+    <line id="cross" y1="${P.t}" y2="${H - P.b}" stroke="var(--text-3)" stroke-width="1" opacity="0"/>
+    </svg>`;
+
+  leg.innerHTML = syms.map((s, k) =>
+    `<span><i style="background:${css(S[k % 8])}"></i>${s}</span>`).join('');
+
+  // Hover layer: mandatory on line/area charts.
+  const svg = cont.querySelector('svg'), cross = svg.querySelector('#cross'), tip = document.getElementById('tip');
+  svg.querySelector('#cap').addEventListener('mousemove', e => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - P.l) / (W - P.l - P.r) * (n - 1))));
+    cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('opacity', '.45');
+    tip.innerHTML = `<div style="color:var(--text-3);margin-bottom:5px">${fechas[i]}</div>` +
+      syms.map((s, k) => {
+        const p = norm[s][i];
+        const crudo = series[s][i];
+        return `<div style="display:flex;gap:9px;justify-content:space-between">
+          <span style="color:${css(S[k % 8])}">■</span><span style="flex:1">${s}</span>
+          <strong>${p ? fmt(p[1], 1) : '—'}</strong>
+          <span style="color:var(--text-3)">${crudo ? precio(crudo[1]) : ''}</span></div>`;
+      }).join('');
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - 240) + 'px';
+    tip.style.top = (e.clientY - 12) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); });
+
+  // Table view: accessibility, and the relief for the contrast WARN.
+  const paso = Math.max(1, Math.floor(n / 14));
+  let t = `<table><thead><tr><th>date</th>${syms.map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>`;
+  for (let i = 0; i < n; i += paso) {
+    t += `<tr><td>${fechas[i]}</td>${syms.map(s => {
+      const p = (series[s] || [])[i];
+      return `<td>${p ? fmt(p[1], 3) : '—'}</td>`;
+    }).join('')}</tr>`;
+  }
+  document.getElementById('tabla-cmp').innerHTML = t + '</tbody></table>';
+}
+
+function detalle(sym, datos, st) {
+  const i = INSTR.find(x => x.symbol === sym) || {};
+  document.getElementById('t-stats').textContent = `${sym} — ${i.name || ''}`;
+  document.getElementById('n-stats').textContent =
+    `${st.bars} candles · ${st.from} → ${st.to}${i.unit ? ' · ' + i.unit : ''}`;
+
+  const tiles = [
+    ['latest', precio(i.last)],
+    ['low', precio(st.min)],
+    ['high', precio(st.max)],
+    ['average', precio(st.avg)],
+    ['annual volatility', st.annualized_vol_pct == null ? '—' : fmt(st.annualized_vol_pct, 1) + '%'],
+  ];
+  document.getElementById('tiles').innerHTML = tiles.map(([k, v]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  if (datos.length < 2) { document.getElementById('precio').innerHTML = ''; return; }
+  const W = 980, H = 190, P = { t: 10, r: 12, b: 24, l: 46 };
+  const vs = datos.map(d => d[1]);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const pad = (hi - lo) * .1 || 1; lo -= pad; hi += pad;
+  const X = k => P.l + k / (datos.length - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  let g = '';
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${precio(v)}</text>`;
+  }
+  const c = css('--s1');
+  const linea = datos.map(([, v], k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  const area = `${linea} L${X(datos.length - 1)} ${H - P.b} L${P.l} ${H - P.b} Z`;
+  g += `<path d="${area}" fill="${c}" opacity=".08"/>
+        <path d="${linea}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
+  [0, datos.length - 1].forEach(k =>
+    g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
+  document.getElementById('precio').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price of ${sym}">${g}</svg>`;
+}
+
+const ICO = { ok: 'i-ok', warn: 'i-warn', crit: 'i-crit', mute: 'i-mute' };
+const estadoHtml = (clase, texto) =>
+  `<span class="estado ${clase}"><svg viewBox="0 0 24 24"><use href="#${ICO[clase]}"/></svg>${texto}</span>`;
+
+async function alertas() {
+  const d = await (await fetch('/api/alerts')).json();
+  const c = document.getElementById('alerts');
+  if (!d.length) { c.innerHTML = '<div class="empty">No rules configured.</div>'; return; }
+  const mapa = { disparada: ['crit', 'firing'], ok: ['ok', 'quiet'], sin_datos: ['mute', 'no data'] };
+  const dis = d.filter(x => x.estado === 'disparada').length;
+  c.innerHTML = `
+    <div style="margin-bottom:var(--sp-4)">${dis
+      ? estadoHtml('crit', `${dis} rule(s) firing of ${d.length}`)
+      : estadoHtml('ok', `all ${d.length} rules are quiet`)}</div>
+    <div class="lista-estado">${d.map(x => {
+      const [cl, txt] = mapa[x.estado];
+      return `<div>${estadoHtml(cl, txt)}<span class="det"><strong>${x.name}</strong> — ${x.mensaje}</span></div>`;
+    }).join('')}</div>`;
+}
+
+async function calidad() {
+  const d = await (await fetch('/api/quality')).json();
+  const c = document.getElementById('quality');
+  const resumen = d.critical
+    ? estadoHtml('crit', `${d.critical} critical issue(s)`)
+    : d.warning ? estadoHtml('warn', `${d.warning} warning(s), nothing critical`)
+                : estadoHtml('ok', `${d.instruments} instruments with no findings`);
+  c.innerHTML = `
+    <div style="margin-bottom:var(--sp-4)">${resumen}</div>
+    ${d.findings.length ? `<div class="lista-estado">${d.findings.map(f =>
+      `<div>${estadoHtml(f.severidad === 'critical' ? 'crit' : 'warn', f.symbol)}
+        <span class="det">${f.detalle}</span></div>`).join('')}</div>`
+      : '<div class="empty">No findings.</div>'}`;
+}
+
+/* Basket: unit cost, exposure and scenario.
+   This is what turns commodity prices into THIS plant's cost. */
+let ESC = {};
+async function canasta() {
+  const lista = await (await fetch('/api/baskets')).json();
+  const card = document.getElementById('card-basket');
+  if (!lista.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const nombre = lista[0].name;
+  const d = await (await fetch(`/api/basket?name=${encodeURIComponent(nombre)}&days=${DIAS}`)).json();
+  if (!d.series.length) { document.getElementById('n-basket').textContent = 'No complete days in this range.'; return; }
+
+  const hoy = d.series[d.series.length - 1], ini = d.series[0];
+  const cambio = (hoy[1] / ini[1] - 1) * 100;
+  document.getElementById('n-basket').innerHTML =
+    `<strong>${nombre}</strong> · per ${d.output_unit} · ${d.series.length} complete days.
+     A day only counts if <em>all</em> inputs traded: filling the missing one would hide
+     that a source stopped reporting.`;
+
+  document.getElementById('basket-tiles').innerHTML = `
+    <div class="tile"><div class="k">cost today</div><div class="v">${fmt(hoy[1], 0)}</div></div>
+    <div class="tile"><div class="k">at period start</div><div class="v">${fmt(ini[1], 0)}</div></div>
+    <div class="tile"><div class="k">change</div>
+      <div class="v" style="color:${cambio >= 0 ? css('--critical') : css('--good')}">${cambio >= 0 ? '+' : ''}${fmt(cambio, 1)}%</div></div>
+    <div class="tile"><div class="k">inputs</div><div class="v">${d.components.length}</div></div>`;
+
+  // Cost series
+  const W = 980, H = 200, P = { t: 10, r: 12, b: 24, l: 62 };
+  const vs = d.series.map(x => x[1]);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const pad = (hi - lo) * .1 || 1; lo -= pad; hi += pad;
+  const X = k => P.l + k / (d.series.length - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  let g = '';
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${fmt(v, 0)}</text>`;
+  }
+  const c = css('--s2');
+  const ln = d.series.map(([, v], k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  g += `<path d="${ln} L${X(d.series.length - 1)} ${H - P.b} L${P.l} ${H - P.b} Z" fill="${c}" opacity=".08"/>
+        <path d="${ln}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>
+        <text class="axis" x="${P.l}" y="${H - 6}">${ini[0]}</text>
+        <text class="axis" x="${W - P.r}" y="${H - 6}" text-anchor="end">${hoy[0]}</text>`;
+  document.getElementById('basket-chart').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Unit cost of ${nombre}">${g}</svg>`;
+
+  // Exposure: horizontal bars, sorted. Answers "if I hedge one, how much is left".
+  const comps = [...d.components].sort((a, b) => (b.share_pct || 0) - (a.share_pct || 0));
+  document.getElementById('basket-expo').innerHTML = `
+    <h2 style="font-size:13px;margin:0 0 3px">What your cost depends on</h2>
+    <p class="note">Hedging an input that weighs 0.1% changes nothing. This is the list that
+      says where to look.</p>
+    <table><thead><tr><th>input</th><th>quantity</th><th>cost</th><th>weight</th><th style="width:34%"></th></tr></thead><tbody>
+    ${comps.map((x, i) => `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${css(S[i % 8])};margin-right:7px"></span>${x.symbol}</td>
+      <td>${fmt(x.qty, 1)} ${x.qty_unit}</td>
+      <td>${fmt(x.cost, 2)}</td>
+      <td>${fmt(x.share_pct, 1)}%</td>
+      <td><div style="background:var(--surface-2);border-radius:3px;height:9px">
+        <div style="width:${(x.share_pct || 0).toFixed(1)}%;background:${css(S[i % 8])};height:9px;border-radius:3px"></div></div></td>
+    </tr>`).join('')}</tbody></table>`;
+
+  // Scenario
+  ESC = {};
+  document.getElementById('basket-esc').innerHTML = `
+    <h2 style="font-size:13px;margin:0 0 3px">What if…</h2>
+    <p class="note">Move an input and watch the impact on total cost. The others stay put:
+      propagating the move via correlation would turn an explicit scenario into a covert
+      forecast.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+      ${comps.map(x => `<label style="font-size:12px;color:var(--text-2)">${x.symbol}
+        <input type="range" min="-40" max="40" value="0" step="1" data-sym="${x.symbol}"
+          style="display:block;width:150px;margin-top:5px">
+        <span data-out="${x.symbol}" style="font-variant-numeric:tabular-nums">0%</span></label>`).join('')}
+      <div style="margin-left:auto;text-align:right">
+        <div class="k" style="color:var(--text-3);font-size:10.5px;text-transform:uppercase">impact on cost</div>
+        <div id="esc-out" style="font-size:22px;font-variant-numeric:tabular-nums">—</div>
+      </div>
+    </div>`;
+  document.querySelectorAll('#basket-esc input[type=range]').forEach(r => {
+    r.oninput = async () => {
+      const s = r.dataset.sym;
+      ESC[s] = +r.value;
+      document.querySelector(`[data-out="${s}"]`).textContent = (r.value > 0 ? '+' : '') + r.value + '%';
+      const res = await (await fetch('/api/basket/scenario', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nombre, shocks: ESC }),
+      })).json();
+      const o = document.getElementById('esc-out');
+      const dp = res.delta_pct;
+      o.textContent = (dp > 0 ? '+' : '') + fmt(dp, 2) + '%';
+      o.style.color = Math.abs(dp) < .01 ? 'var(--text-1)' : dp > 0 ? css('--critical') : css('--good');
+    };
+  });
+}
+
+/* Buy signal. The centre of this panel is NOT the band but the MEASURED EDGE: a band
+   reading "very cheap" with a negative edge means that, for that instrument, buying cheap
+   historically came out WORSE than buying on any random day. Showing the band without the
+   edge would turn an honest measurement into false advice. */
+async function senal(sym) {
+  const cont = document.getElementById('signal');
+  const d = await (await fetch(`/api/signal?symbol=${sym}&horizon=60`)).json();
+  if (!d.banda) { cont.innerHTML = `<div class="empty">${d.aviso || 'Sin datos'}</div>`; return; }
+
+  const pos = d.pos_rango_252d, v = d.ventaja_pct;
+  const barato = pos < .4;
+  // Colour is decided by the EVIDENCE, not the band. With no measurable edge it is grey.
+  const util = v != null && Math.abs(v) >= 1.0;
+  const col = !util ? 'var(--text-3)' : v > 0 ? css('--good') : css('--critical');
+
+  const W = 620, H = 46, m = 10;
+  let g = `<rect x="${m}" y="14" width="${W - m * 2}" height="9" rx="4.5" fill="var(--surface-2)"/>`;
+  [[0,.2],[.2,.4],[.4,.6],[.6,.8],[.8,1]].forEach(([a,b],i) => {
+    const x = m + a * (W - m*2), w = (b - a) * (W - m*2);
+    g += `<rect x="${x+1}" y="14" width="${w-2}" height="9" rx="4.5"
+            fill="${css('--s1')}" opacity="${(.10 + (1-i)*.06).toFixed(2)}"/>`;
+  });
+  const px = m + pos * (W - m * 2);
+  g += `<circle cx="${px}" cy="18.5" r="7" fill="${css('--s1')}" stroke="var(--surface-1)" stroke-width="2"/>
+        <text x="${m}" y="40" class="axis">year low</text>
+        <text x="${W-m}" y="40" class="axis" text-anchor="end">year high</text>`;
+
+  cont.innerHTML = `
+    <div class="tiles" style="margin-bottom:14px">
+      <div class="tile"><div class="k">state today</div>
+        <div class="v" style="font-size:15px">${d.etiqueta}</div></div>
+      <div class="tile"><div class="k">position in range</div>
+        <div class="v">${(pos*100).toFixed(0)}%</div></div>
+      <div class="tile"><div class="k">historical edge</div>
+        <div class="v" style="color:${col}">${v == null ? '—' : (v>0?'+':'')+v.toFixed(1)+' pts'}</div></div>
+      <div class="tile"><div class="k">cases measured</div>
+        <div class="v">${d.n_historico ?? '—'}</div></div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:100%"
+      role="img" aria-label="Price position within its 52-week range">${g}</svg>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-2);line-height:1.55">${d.lectura || ''}</p>
+    <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:${col}">
+      <strong>${!util
+        ? 'No measurable edge: for this instrument the signal adds nothing. Buy on a calendar.'
+        : v > 0
+          ? 'Historically, buying in this band came out better than buying without looking.'
+          : 'Careful: historically, buying in this band came out WORSE than buying without looking. Intuition is inverted here.'}</strong></p>
+    <p class="note" style="margin-top:10px">${d.advertencia}</p>`;
+}
+
+/* Correlation matrix — DIVERGING scale (blue ↔ red, grey in the middle).
+   This is polarity: -1 and +1 are opposites and 0 is "nothing". A sequential scale here
+   would lie, painting -1 and 0 as if they were neighbours. */
+function correlacion(data) {
+  const syms = data.symbols, m = {};
+  data.matrix.forEach(x => { m[x.a + '|' + x.b] = x.r; });
+  const cel = 46, izq = 108, arr = 26;
+  const W = izq + cel * syms.length + 10, H = arr + cel * syms.length + 6;
+  let g = '';
+  syms.forEach((s, j) =>
+    g += `<text class="axis" x="${izq + cel * j + cel / 2}" y="${arr - 9}" text-anchor="middle">${s.slice(0, 7)}</text>`);
+  syms.forEach((a, i) => {
+    g += `<text class="axis" x="${izq - 8}" y="${arr + cel * i + cel / 2 + 3.5}" text-anchor="end">${a.slice(0, 14)}</text>`;
+    syms.forEach((b, j) => {
+      const r = m[a + '|' + b];
+      const x = izq + cel * j, y = arr + cel * i;
+      let bg = 'var(--surface-2)', ink = 'var(--text-3)';
+      if (r != null) {
+        // Dos polos + gris neutro. La opacidad codifica la magnitud.
+        bg = r >= 0 ? css('--s1') : css('--s8');
+        ink = Math.abs(r) > .55 ? '#fff' : 'var(--text-1)';
+      }
+      g += `<rect x="${x + 1}" y="${y + 1}" width="${cel - 2}" height="${cel - 2}" rx="5"
+              fill="${bg}" opacity="${r == null ? 1 : (.12 + Math.abs(r) * .8).toFixed(2)}"/>
+            <text x="${x + cel / 2}" y="${y + cel / 2 + 4}" text-anchor="middle"
+              font-size="11.5" font-weight="500" fill="${ink}">${r == null ? '—' : r.toFixed(2)}</text>`;
+    });
+  });
+  document.getElementById('corr').innerHTML =
+    `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}"
+       style="width:${W}px;max-width:100%;height:auto"
+       role="img" aria-label="Correlation matrix of daily returns">${g}</svg></div>
+     <div class="legend"><span><i style="background:${css('--s1')}"></i>move together (+)</span>
+       <span><i style="background:${css('--s8')}"></i>move opposite (−)</span>
+       <span><i style="background:var(--surface-2)"></i>no relationship (0)</span></div>`;
+}
+
+init();
+</script>
