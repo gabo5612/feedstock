@@ -14,11 +14,46 @@ medido y reproducible"*.
 |---|---|---|
 | **M0** | Docker + Timescale + pgvector | ✅ |
 | **M1** | Ingesta + backfill 10 años, 12 instrumentos | ✅ |
-| M2 | Features + **guard de fuga en CI** | ⬜ |
+| **M2** | Features + **guard de fuga en CI** | ✅ |
 | M3 | Backtest + baseline naive publicado primero | ⬜ |
 | M4 | ARIMA + LightGBM contra el baseline | ⬜ |
 | M5 | Anomalías + régimen + dashboard | ⬜ |
 | M6 | Ollama con citas + compose offline | ⬜ |
+
+## La canasta de costo
+
+Define la mezcla real de un producto (*"340 kg de cobre, 120 de aluminio, 0,8 MWh"*) y el
+dashboard deja de mostrar precios genéricos para mostrar **tu costo unitario**.
+
+Sobre la mezcla de ejemplo, medido: el costo subió **+47,8% en un año**, y el **92,2%
+depende del cobre** — cubrir el gas (0,1%) no cambiaría nada.
+
+Las unidades se convierten explícitamente y **fallan fuerte** ante lo desconocido: una
+conversión implícita kg↔lb daría un costo 2,2 veces equivocado sin producir ningún error.
+La onza troy (31,1 g) está separada de la común (28,35 g) porque confundirlas mete un 10%
+de error en oro y plata.
+
+## ¿Es buen momento para comprar?
+
+**No predice el precio.** Dice dónde está hoy respecto de su propia historia y **qué pasó
+después las veces anteriores que estuvo ahí**, contra el baseline de comprar sin mirar.
+
+El resultado, medido sobre 10 años y publicado tal cual: **la intuición no se sostiene, y
+en varios instrumentos está invertida.**
+
+| instrumento | banda | n | ventaja |
+|---|---|---|---|
+| copper | muy_barato | 286 | **−1,8** |
+| aluminium | muy_barato | 641 | **+3,3** |
+| natgas | barato | 505 | **−4,9** |
+| natgas | muy_caro | 384 | **+5,7** |
+
+Comprar cobre barato salió *peor* que comprar en un día cualquiera. En gas está invertido.
+Solo el aluminio se comporta como dice el sentido común.
+
+Los cortes son quintiles elegidos **antes** de correr el backtest y no se movieron después.
+El panel muestra la ventaja medida junto a la banda, y su color lo decide la evidencia:
+una banda "muy barato" con ventaja negativa se pinta en rojo.
 
 ## Dashboard
 

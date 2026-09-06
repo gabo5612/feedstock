@@ -138,6 +138,15 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
       <div id="precio" style="margin-top:16px"></div>
     </div>
 
+    <div class="card" id="card-basket">
+      <h2>Tu costo unitario</h2>
+      <p class="note" id="n-basket"></p>
+      <div class="tiles" id="basket-tiles"></div>
+      <div id="basket-chart" style="margin-top:16px"></div>
+      <div id="basket-expo" style="margin-top:18px"></div>
+      <div id="basket-esc" style="margin-top:18px"></div>
+    </div>
+
     <div class="card" id="card-signal">
       <h2>¿Es buen momento para comprar?</h2>
       <p class="note">Dónde está el precio respecto de <strong>su propia historia</strong>,
@@ -264,6 +273,7 @@ async function cargar() {
   lineas(ser.series);
   detalle(SEL[0], ser.series[SEL[0]] || [], stats);
   senal(SEL[0]);
+  canasta();
   if (SEL.length > 1) {
     correlacion(await (await fetch(`/api/correlation?${q}`)).json());
     document.getElementById('card-corr').style.display = '';
@@ -409,6 +419,104 @@ function detalle(sym, datos, st) {
     g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
   document.getElementById('precio').innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio de ${sym}">${g}</svg>`;
+}
+
+/* Canasta: costo unitario, exposicion y escenario.
+   Es lo que convierte precios de commodities en el costo de ESTA planta. */
+let ESC = {};
+async function canasta() {
+  const lista = await (await fetch('/api/baskets')).json();
+  const card = document.getElementById('card-basket');
+  if (!lista.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const nombre = lista[0].name;
+  const d = await (await fetch(`/api/basket?name=${encodeURIComponent(nombre)}&days=${DIAS}`)).json();
+  if (!d.series.length) { document.getElementById('n-basket').textContent = 'Sin días completos en este rango.'; return; }
+
+  const hoy = d.series[d.series.length - 1], ini = d.series[0];
+  const cambio = (hoy[1] / ini[1] - 1) * 100;
+  document.getElementById('n-basket').innerHTML =
+    `<strong>${nombre}</strong> · por ${d.output_unit} · ${d.series.length} días completos.
+     Un día solo cuenta si <em>todos</em> los insumos cotizaron: rellenar el faltante
+     escondería que una fuente dejó de reportar.`;
+
+  document.getElementById('basket-tiles').innerHTML = `
+    <div class="tile"><div class="k">costo hoy</div><div class="v">${fmt(hoy[1], 0)}</div></div>
+    <div class="tile"><div class="k">al inicio del período</div><div class="v">${fmt(ini[1], 0)}</div></div>
+    <div class="tile"><div class="k">variación</div>
+      <div class="v" style="color:${cambio >= 0 ? css('--critical') : css('--good')}">${cambio >= 0 ? '+' : ''}${fmt(cambio, 1)}%</div></div>
+    <div class="tile"><div class="k">insumos</div><div class="v">${d.components.length}</div></div>`;
+
+  // Serie del costo
+  const W = 980, H = 200, P = { t: 10, r: 12, b: 24, l: 62 };
+  const vs = d.series.map(x => x[1]);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const pad = (hi - lo) * .1 || 1; lo -= pad; hi += pad;
+  const X = k => P.l + k / (d.series.length - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  let g = '';
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${fmt(v, 0)}</text>`;
+  }
+  const c = css('--s2');
+  const ln = d.series.map(([, v], k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  g += `<path d="${ln} L${X(d.series.length - 1)} ${H - P.b} L${P.l} ${H - P.b} Z" fill="${c}" opacity=".08"/>
+        <path d="${ln}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>
+        <text class="axis" x="${P.l}" y="${H - 6}">${ini[0]}</text>
+        <text class="axis" x="${W - P.r}" y="${H - 6}" text-anchor="end">${hoy[0]}</text>`;
+  document.getElementById('basket-chart').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Costo unitario de ${nombre}">${g}</svg>`;
+
+  // Exposicion: barras horizontales, ordenadas. Responde "si cubro uno, cuanto me queda".
+  const comps = [...d.components].sort((a, b) => (b.share_pct || 0) - (a.share_pct || 0));
+  document.getElementById('basket-expo').innerHTML = `
+    <h2 style="font-size:13px;margin:0 0 3px">De qué depende tu costo</h2>
+    <p class="note">Cubrir un insumo que pesa 0,1% no cambia nada. Esta es la lista que
+      dice dónde mirar.</p>
+    <table><thead><tr><th>insumo</th><th>cantidad</th><th>costo</th><th>peso</th><th style="width:34%"></th></tr></thead><tbody>
+    ${comps.map((x, i) => `<tr>
+      <td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${css(S[i % 8])};margin-right:7px"></span>${x.symbol}</td>
+      <td>${fmt(x.qty, 1)} ${x.qty_unit}</td>
+      <td>${fmt(x.cost, 2)}</td>
+      <td>${fmt(x.share_pct, 1)}%</td>
+      <td><div style="background:var(--surface-2);border-radius:3px;height:9px">
+        <div style="width:${(x.share_pct || 0).toFixed(1)}%;background:${css(S[i % 8])};height:9px;border-radius:3px"></div></div></td>
+    </tr>`).join('')}</tbody></table>`;
+
+  // Escenario
+  ESC = {};
+  document.getElementById('basket-esc').innerHTML = `
+    <h2 style="font-size:13px;margin:0 0 3px">Qué pasa si…</h2>
+    <p class="note">Moveé un insumo y mirá el impacto en el costo total. Los demás quedan
+      quietos: propagar el movimiento vía correlación convertiría un escenario explícito
+      en un pronóstico encubierto.</p>
+    <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
+      ${comps.map(x => `<label style="font-size:12px;color:var(--text-2)">${x.symbol}
+        <input type="range" min="-40" max="40" value="0" step="1" data-sym="${x.symbol}"
+          style="display:block;width:150px;margin-top:5px">
+        <span data-out="${x.symbol}" style="font-variant-numeric:tabular-nums">0%</span></label>`).join('')}
+      <div style="margin-left:auto;text-align:right">
+        <div class="k" style="color:var(--text-3);font-size:10.5px;text-transform:uppercase">impacto en el costo</div>
+        <div id="esc-out" style="font-size:22px;font-variant-numeric:tabular-nums">—</div>
+      </div>
+    </div>`;
+  document.querySelectorAll('#basket-esc input[type=range]').forEach(r => {
+    r.oninput = async () => {
+      const s = r.dataset.sym;
+      ESC[s] = +r.value;
+      document.querySelector(`[data-out="${s}"]`).textContent = (r.value > 0 ? '+' : '') + r.value + '%';
+      const res = await (await fetch('/api/basket/scenario', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: nombre, shocks: ESC }),
+      })).json();
+      const o = document.getElementById('esc-out');
+      const dp = res.delta_pct;
+      o.textContent = (dp > 0 ? '+' : '') + fmt(dp, 2) + '%';
+      o.style.color = Math.abs(dp) < .01 ? 'var(--text-1)' : dp > 0 ? css('--critical') : css('--good');
+    };
+  });
 }
 
 /* Senal de compra. Lo central del panel NO es la banda sino la VENTAJA MEDIDA: una banda

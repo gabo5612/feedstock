@@ -199,6 +199,31 @@ def signals(horizon: int = Query(60, ge=5, le=252)) -> list[dict]:
     return [recomendacion(i.symbol, horizonte=horizon) for i in INSTRUMENTS]
 
 
+@app.get("/api/baskets")
+def baskets() -> list[dict]:
+    from ..basket import listar
+
+    return listar()
+
+
+@app.get("/api/basket")
+def basket_cost(name: str, days: int = Query(365, ge=30, le=4000)) -> dict:
+    from ..basket import serie_costo
+
+    return serie_costo(name, days=days)
+
+
+@app.post("/api/basket/scenario")
+def basket_scenario(payload: dict) -> dict:
+    """`{"name": "...", "shocks": {"copper": 10, "natgas": -20}}`"""
+    from ..basket import escenario
+
+    nombre = payload.get("name")
+    if not nombre:
+        raise HTTPException(400, "falta `name`")
+    return escenario(nombre, payload.get("shocks") or {})
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")
