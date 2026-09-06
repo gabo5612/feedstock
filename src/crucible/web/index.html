@@ -1,7 +1,7 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>crucible — riesgo de costo de insumos</title>
+<title>crucible — input cost risk</title>
 <style>
 /* Paleta validada con el validador del metodo (8 slots categoricos, luz y oscuro).
    El WARN de contraste en modo claro (aqua, amarillo, magenta bajo 3:1) se cubre con
@@ -40,8 +40,8 @@
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
   --good: #0ca30c; --critical: #d03b3b;
 }
-/* Ritmo de 4px y escala tipográfica fija. Sin esto cada componente inventa su propio
-   espaciado y el conjunto se ve armado por partes. */
+/* 4px rhythm and a fixed type scale. Without this every component invents its own
+   spacing and the whole thing looks assembled from parts. */
 :root {
   --sp-1: 4px; --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-5: 24px; --sp-6: 32px;
   --fs-xs: 11px; --fs-sm: 12.5px; --fs-md: 14px; --fs-lg: 17px; --fs-xl: 22px;
@@ -55,7 +55,7 @@ body {
   font: var(--fs-md)/1.55 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-/* Números tabulares en TODO dato: sin esto las columnas bailan al actualizarse. */
+/* Tabular figures on EVERY data value: without them columns jitter as they update. */
 .px, .v, td, th, .axis, #esc-out { font-variant-numeric: tabular-nums; }
 
 /* Foco visible. Es el punto 1 de accesibilidad y no estaba: sin esto la interfaz es
@@ -87,11 +87,11 @@ h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.01em; }
 .row { display: grid; grid-template-columns: 12px 1fr auto; gap: 10px; align-items: center;
   padding: var(--sp-2) var(--sp-2); border-radius: var(--r-sm); border: 0; background: none;
   color: inherit; font: inherit; text-align: left; width: 100%;
-  min-height: 44px;                     /* área táctil mínima */
+  min-height: 44px;                     /* minimum touch target */
   transition: background var(--t); position: relative; }
 .row:hover { background: var(--surface-2); }
 .row[aria-pressed="true"] { background: var(--surface-2); }
-/* La selección no se indica solo por color: lleva una barra que se ve sin distinguir tonos. */
+/* Selection is not signalled by colour alone: it carries a bar visible without hue. */
 .row[aria-pressed="true"]::before {
   content: ""; position: absolute; left: 0; top: 9px; bottom: 9px; width: 3px;
   border-radius: 0 3px 3px 0; background: var(--text-1);
@@ -123,8 +123,8 @@ main { padding: 18px 22px 40px; min-width: 0; }
 .tile .v { font-size: var(--fs-xl); margin-top: var(--sp-1); letter-spacing: -.025em;
   line-height: 1.2; }
 
-/* Estado: icono + texto, NUNCA solo color. Es la regla de no depender del color para
-   comunicar, y además sobrevive a una captura en blanco y negro. */
+/* State: icon + text, NEVER colour alone. This is the rule against relying on colour to
+   communicate, and it also survives a black-and-white screenshot. */
 .estado { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-sm);
   font-weight: 500; }
 .estado svg { width: 14px; height: 14px; flex: none; }
@@ -173,9 +173,9 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
 <div class="wrap">
   <aside>
     <h1>crucible</h1>
-    <div class="sub">riesgo de costo de insumos · local</div>
+    <div class="sub">input cost risk · local</div>
 
-    <input id="q" class="field" type="search" placeholder="Buscar instrumento…" autocomplete="off">
+    <input id="q" class="field" type="search" placeholder="Search instrument…" autocomplete="off">
     <div class="chips" id="clases"></div>
     <div class="rowlist" id="lista"></div>
     <div class="hint" id="hint"></div>
@@ -185,22 +185,22 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
     <div class="bar">
       <div class="chips" id="rangos" style="margin:0"></div>
       <div class="spacer"></div>
-      <button class="chip" id="tema" aria-label="Cambiar entre claro y oscuro"><svg viewBox="0 0 24 24"><use href="#i-theme"/></svg>tema</button>
+      <button class="chip" id="tema" aria-label="Toggle light and dark"><svg viewBox="0 0 24 24"><use href="#i-theme"/></svg>theme</button>
     </div>
 
     <div class="card">
-      <h2 id="t-cmp"</h2>
+      <h2 id="t-cmp"><svg viewBox="0 0 24 24"><use href="#i-chart"/></svg>Indexed comparison</h2>
       <p class="note" id="n-cmp"></p>
       <div id="cmp"></div>
       <div class="legend" id="leg-cmp"></div>
       <details>
-        <summary>Ver los datos como tabla</summary>
+        <summary>View the data as a table</summary>
         <div id="tabla-cmp" style="margin-top:10px"></div>
       </details>
     </div>
 
     <div class="card" id="card-stats">
-      <h2 id="t-stats">Detalle</h2>
+      <h2 id="t-stats">Detail</h2>
       <p class="note" id="n-stats"></p>
       <div class="tiles" id="tiles"></div>
       <div id="precio" style="margin-top:16px"></div>
@@ -217,32 +217,32 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
 
     <div class="card" id="card-signal">
       <h2</h2>
-      <p class="note">Dónde está el precio respecto de <strong>su propia historia</strong>,
-        y —lo que importa— <strong>qué pasó después las veces anteriores que estuvo ahí</strong>,
-        medido sobre 10 años. No es un pronóstico.</p>
+      <p class="note">Where the price sits relative to <strong>its own history</strong>, and
+        — what matters — <strong>what happened afterwards the previous times it sat
+        there</strong>, measured over 10 years. This is not a forecast.</p>
       <div id="signal"></div>
     </div>
 
     <div class="card" id="card-alerts">
-      <h2><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg>Alertas</h2>
-      <p class="note">Corren locales, sin servicio externo. Una regla que no se puede
-        evaluar dice <strong>sin datos</strong>, no «ok»: pintar en verde lo que no se pudo
-        medir da confianza donde no hay información.</p>
+      <h2><svg viewBox="0 0 24 24"><use href="#i-bell"/></svg>Alerts</h2>
+      <p class="note">They run locally, with no external service. A rule that cannot be
+        evaluated says <strong>no data</strong>, not "ok": painting green over what could not
+        be measured gives confidence where there is no information.</p>
       <div id="alerts"></div>
     </div>
 
     <div class="card" id="card-quality">
-      <h2><svg viewBox="0 0 24 24"><use href="#i-shield"/></svg>Calidad de los datos</h2>
-      <p class="note">Frescura, huecos, deriva de nombre y valores atípicos. Un dato malo
-        que nadie mira es peor que uno que falta: el que falta se nota, el malo se usa.</p>
+      <h2><svg viewBox="0 0 24 24"><use href="#i-shield"/></svg>Data quality</h2>
+      <p class="note">Freshness, gaps, name drift and outliers. Bad data nobody looks at is
+        worse than missing data: the missing kind gets noticed, the bad kind gets used.</p>
       <div id="quality"></div>
     </div>
 
     <div class="card" id="card-corr">
       <h2</h2>
-      <p class="note">Correlación de <strong>retornos diarios</strong>, no de precios: dos
-        series con tendencia dan correlación alta aunque no tengan relación. Si el cobre y
-        la energía se mueven juntos, cubrir uno no cubre el otro.</p>
+      <p class="note">Correlation of <strong>daily returns</strong>, not prices: two trending
+        series correlate highly even when unrelated. If copper and energy move together,
+        hedging one does not hedge the other.</p>
       <div id="corr"></div>
     </div>
   </main>
@@ -254,8 +254,8 @@ const S = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
 const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const fmt = (n, d = 2) => n == null ? '—' :
   n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
-/* Decimales segun magnitud: un precio de 6.68 necesita tres y uno de 4477 ninguno.
-   Fijarlos en 3 para todo hace que 91.48 se imprima "91,480" y se lea como 91 mil. */
+/* Decimals by magnitude: a price of 6.68 needs three and one of 4477 needs none.
+   Fixing them at 3 makes 91.48 print as "91,480" and read as ninety-one thousand. */
 const dec = v => v == null ? 2 : Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 100 ? 1 : 2;
 const precio = v => fmt(v, dec(v));
 const el = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; };
@@ -267,7 +267,7 @@ const RANGOS = [[90,'3M'],[365,'1A'],[1095,'3A'],[1825,'5A'],[3650,'10A']];
 async function init() {
   try { INSTR = await (await fetch('/api/instruments')).json(); }
   catch { document.getElementById('lista').innerHTML =
-    '<div class="empty">No se pudo leer la base.<br>¿Levantaste <code>docker-compose up -d</code>?</div>'; return; }
+    '<div class="empty">Could not read the database.<br>Did you run <code>docker-compose up -d</code>?</div>'; return; }
 
   const clases = [...new Set(INSTR.map(i => i.asset_class))];
   const cc = document.getElementById('clases');
@@ -308,7 +308,7 @@ function pintarLista() {
     (!CLASE || i.asset_class === CLASE) &&
     (!Q || i.symbol.includes(Q) || (i.name || '').toLowerCase().includes(Q)));
   cont.innerHTML = '';
-  if (!vis.length) { cont.append(el('<div class="empty">Nada coincide.</div>')); return; }
+  if (!vis.length) { cont.append(el('<div class="empty">Nothing matches.</div>')); return; }
 
   vis.forEach(i => {
     const idx = SEL.indexOf(i.symbol);
@@ -326,22 +326,22 @@ function pintarLista() {
     cont.append(b);
   });
   document.getElementById('hint').textContent =
-    `${SEL.length} de 8 seleccionados · variación a 30 días`;
+    `${SEL.length} of 8 selected · 30-day change`;
 }
 
 function alternar(sym) {
   const i = SEL.indexOf(sym);
   if (i >= 0) SEL.splice(i, 1);
-  else if (SEL.length < 8) SEL.push(sym);   // 8 = tope de la paleta validada
+  else if (SEL.length < 8) SEL.push(sym);   // 8 = ceiling of the validated palette
   else { document.getElementById('hint').textContent =
-    'Máximo 8: un noveno color no se inventa. Deseleccioná uno.'; return; }
+    'Maximum 8: a ninth colour is not invented. Deselect one.'; return; }
   pintarLista(); cargar();
 }
 
 /* ── datos y pintado ───────────────────────────────────────────────── */
 async function cargar() {
   if (!SEL.length) {
-    document.getElementById('cmp').innerHTML = '<div class="empty">Elegí al menos un instrumento.</div>';
+    document.getElementById('cmp').innerHTML = '<div class="empty">Pick at least one instrument.</div>';
     document.getElementById('leg-cmp').innerHTML = '';
     document.getElementById('tiles').innerHTML = '';
     document.getElementById('precio').innerHTML = '';
@@ -365,16 +365,16 @@ async function cargar() {
   } else document.getElementById('card-corr').style.display = 'none';
 }
 
-/* Comparacion INDEXADA a base 100.
-   Nunca dos ejes: el cobre vale ~6.7 USD/lb y el oro ~4400 USD/oz. Superponerlos con
-   escalas distintas hace que dos lineas se crucen por como se dibujo el grafico y no por
-   lo que hicieron los precios. Indexar es la unica lectura honesta de "quien subio mas". */
+/* Comparison INDEXED to base 100.
+   Never two axes: copper trades near 6.7 USD/lb and gold near 4,400 USD/oz. Overlaying them
+   on different scales makes two lines cross because of how the chart was drawn, not because
+   of what the prices did. Indexing is the only honest reading of "which rose more". */
 function lineas(series) {
   const cont = document.getElementById('cmp'), leg = document.getElementById('leg-cmp');
   const syms = SEL.filter(s => (series[s] || []).length > 1);
   document.getElementById('n-cmp').textContent =
-    `Cada serie arranca en 100 en su primera fecha del período: la línea muestra el cambio porcentual, no el precio. ${syms.length>1?'Es la única forma honesta de comparar instrumentos con escalas distintas.':''}`;
-  if (!syms.length) { cont.innerHTML = '<div class="empty">Sin datos en este rango.</div>'; return; }
+    `Every series starts at 100 on its first date in the period: the line shows percentage change, not price. ${syms.length>1?'It is the only honest way to compare instruments on different scales.':''}`;
+  if (!syms.length) { cont.innerHTML = '<div class="empty">No data in this range.</div>'; return; }
 
   const W = 980, H = 340, P = { t: 14, r: 62, b: 26, l: 46 };
   const norm = {}; let lo = Infinity, hi = -Infinity, fechas = [];
@@ -410,9 +410,9 @@ function lineas(series) {
             stroke-linejoin="round" stroke-linecap="round"/>`;
   });
 
-  // Etiquetas directas: identidad sin depender del color, y el alivio que pide el WARN de
-  // contraste del validador en modo claro. Se separan verticalmente si dos series
-  // terminan pegadas — dos nombres superpuestos no identifican nada.
+  // Direct labels: identity without relying on colour, and the relief the validator's
+  // contrast WARN requires in light mode. They separate vertically if two series
+  // end up adjacent — two overlapping names identify nothing.
   const etiquetas = syms.map((s, k) => ({
     s, c: css(S[k % 8]), y: Y(norm[s][norm[s].length - 1][1]), x: X(norm[s].length - 1) + 7,
   })).sort((a, b) => a.y - b.y);
@@ -425,7 +425,7 @@ function lineas(series) {
   });
 
   cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img"
-    aria-label="Comparación indexada a base 100 de ${syms.join(', ')}">${g}
+    aria-label="Comparison indexed to base 100 for ${syms.join(', ')}">${g}
     <rect id="cap" x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent"/>
     <line id="cross" y1="${P.t}" y2="${H - P.b}" stroke="var(--text-3)" stroke-width="1" opacity="0"/>
     </svg>`;
@@ -433,7 +433,7 @@ function lineas(series) {
   leg.innerHTML = syms.map((s, k) =>
     `<span><i style="background:${css(S[k % 8])}"></i>${s}</span>`).join('');
 
-  // Capa de hover: obligatoria en linea/area.
+  // Hover layer: mandatory on line/area charts.
   const svg = cont.querySelector('svg'), cross = svg.querySelector('#cross'), tip = document.getElementById('tip');
   svg.querySelector('#cap').addEventListener('mousemove', e => {
     const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
@@ -454,9 +454,9 @@ function lineas(series) {
   });
   svg.addEventListener('mouseleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); });
 
-  // Vista de tabla: accesibilidad y el alivio del WARN de contraste.
+  // Table view: accessibility, and the relief for the contrast WARN.
   const paso = Math.max(1, Math.floor(n / 14));
-  let t = `<table><thead><tr><th>fecha</th>${syms.map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>`;
+  let t = `<table><thead><tr><th>date</th>${syms.map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>`;
   for (let i = 0; i < n; i += paso) {
     t += `<tr><td>${fechas[i]}</td>${syms.map(s => {
       const p = (series[s] || [])[i];
@@ -470,14 +470,14 @@ function detalle(sym, datos, st) {
   const i = INSTR.find(x => x.symbol === sym) || {};
   document.getElementById('t-stats').textContent = `${sym} — ${i.name || ''}`;
   document.getElementById('n-stats').textContent =
-    `${st.bars} velas · ${st.from} → ${st.to}${i.unit ? ' · ' + i.unit : ''}`;
+    `${st.bars} candles · ${st.from} → ${st.to}${i.unit ? ' · ' + i.unit : ''}`;
 
   const tiles = [
-    ['último', precio(i.last)],
-    ['mínimo', precio(st.min)],
-    ['máximo', precio(st.max)],
-    ['promedio', precio(st.avg)],
-    ['volatilidad anual', st.annualized_vol_pct == null ? '—' : fmt(st.annualized_vol_pct, 1) + '%'],
+    ['latest', precio(i.last)],
+    ['low', precio(st.min)],
+    ['high', precio(st.max)],
+    ['average', precio(st.avg)],
+    ['annual volatility', st.annualized_vol_pct == null ? '—' : fmt(st.annualized_vol_pct, 1) + '%'],
   ];
   document.getElementById('tiles').innerHTML = tiles.map(([k, v]) =>
     `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
@@ -503,7 +503,7 @@ function detalle(sym, datos, st) {
   [0, datos.length - 1].forEach(k =>
     g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
   document.getElementById('precio').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio de ${sym}">${g}</svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Price of ${sym}">${g}</svg>`;
 }
 
 const ICO = { ok: 'i-ok', warn: 'i-warn', crit: 'i-crit', mute: 'i-mute' };
@@ -513,13 +513,13 @@ const estadoHtml = (clase, texto) =>
 async function alertas() {
   const d = await (await fetch('/api/alerts')).json();
   const c = document.getElementById('alerts');
-  if (!d.length) { c.innerHTML = '<div class="empty">Sin reglas configuradas.</div>'; return; }
-  const mapa = { disparada: ['crit', 'disparada'], ok: ['ok', 'tranquila'], sin_datos: ['mute', 'sin datos'] };
+  if (!d.length) { c.innerHTML = '<div class="empty">No rules configured.</div>'; return; }
+  const mapa = { disparada: ['crit', 'firing'], ok: ['ok', 'quiet'], sin_datos: ['mute', 'no data'] };
   const dis = d.filter(x => x.estado === 'disparada').length;
   c.innerHTML = `
     <div style="margin-bottom:var(--sp-4)">${dis
-      ? estadoHtml('crit', `${dis} regla(s) disparada(s) de ${d.length}`)
-      : estadoHtml('ok', `las ${d.length} reglas están tranquilas`)}</div>
+      ? estadoHtml('crit', `${dis} rule(s) firing of ${d.length}`)
+      : estadoHtml('ok', `all ${d.length} rules are quiet`)}</div>
     <div class="lista-estado">${d.map(x => {
       const [cl, txt] = mapa[x.estado];
       return `<div>${estadoHtml(cl, txt)}<span class="det"><strong>${x.name}</strong> — ${x.mensaje}</span></div>`;
@@ -530,19 +530,19 @@ async function calidad() {
   const d = await (await fetch('/api/quality')).json();
   const c = document.getElementById('quality');
   const resumen = d.critical
-    ? estadoHtml('crit', `${d.critical} problema(s) crítico(s)`)
-    : d.warning ? estadoHtml('warn', `${d.warning} aviso(s), nada crítico`)
-                : estadoHtml('ok', `${d.instruments} instrumentos sin hallazgos`);
+    ? estadoHtml('crit', `${d.critical} critical issue(s)`)
+    : d.warning ? estadoHtml('warn', `${d.warning} warning(s), nothing critical`)
+                : estadoHtml('ok', `${d.instruments} instruments with no findings`);
   c.innerHTML = `
     <div style="margin-bottom:var(--sp-4)">${resumen}</div>
     ${d.findings.length ? `<div class="lista-estado">${d.findings.map(f =>
       `<div>${estadoHtml(f.severidad === 'critical' ? 'crit' : 'warn', f.symbol)}
         <span class="det">${f.detalle}</span></div>`).join('')}</div>`
-      : '<div class="empty">Sin hallazgos.</div>'}`;
+      : '<div class="empty">No findings.</div>'}`;
 }
 
-/* Canasta: costo unitario, exposicion y escenario.
-   Es lo que convierte precios de commodities en el costo de ESTA planta. */
+/* Basket: unit cost, exposure and scenario.
+   This is what turns commodity prices into THIS plant's cost. */
 let ESC = {};
 async function canasta() {
   const lista = await (await fetch('/api/baskets')).json();
@@ -551,23 +551,23 @@ async function canasta() {
   card.style.display = '';
   const nombre = lista[0].name;
   const d = await (await fetch(`/api/basket?name=${encodeURIComponent(nombre)}&days=${DIAS}`)).json();
-  if (!d.series.length) { document.getElementById('n-basket').textContent = 'Sin días completos en este rango.'; return; }
+  if (!d.series.length) { document.getElementById('n-basket').textContent = 'No complete days in this range.'; return; }
 
   const hoy = d.series[d.series.length - 1], ini = d.series[0];
   const cambio = (hoy[1] / ini[1] - 1) * 100;
   document.getElementById('n-basket').innerHTML =
-    `<strong>${nombre}</strong> · por ${d.output_unit} · ${d.series.length} días completos.
-     Un día solo cuenta si <em>todos</em> los insumos cotizaron: rellenar el faltante
-     escondería que una fuente dejó de reportar.`;
+    `<strong>${nombre}</strong> · per ${d.output_unit} · ${d.series.length} complete days.
+     A day only counts if <em>all</em> inputs traded: filling the missing one would hide
+     that a source stopped reporting.`;
 
   document.getElementById('basket-tiles').innerHTML = `
-    <div class="tile"><div class="k">costo hoy</div><div class="v">${fmt(hoy[1], 0)}</div></div>
-    <div class="tile"><div class="k">al inicio del período</div><div class="v">${fmt(ini[1], 0)}</div></div>
-    <div class="tile"><div class="k">variación</div>
+    <div class="tile"><div class="k">cost today</div><div class="v">${fmt(hoy[1], 0)}</div></div>
+    <div class="tile"><div class="k">at period start</div><div class="v">${fmt(ini[1], 0)}</div></div>
+    <div class="tile"><div class="k">change</div>
       <div class="v" style="color:${cambio >= 0 ? css('--critical') : css('--good')}">${cambio >= 0 ? '+' : ''}${fmt(cambio, 1)}%</div></div>
-    <div class="tile"><div class="k">insumos</div><div class="v">${d.components.length}</div></div>`;
+    <div class="tile"><div class="k">inputs</div><div class="v">${d.components.length}</div></div>`;
 
-  // Serie del costo
+  // Cost series
   const W = 980, H = 200, P = { t: 10, r: 12, b: 24, l: 62 };
   const vs = d.series.map(x => x[1]);
   let lo = Math.min(...vs), hi = Math.max(...vs);
@@ -587,15 +587,15 @@ async function canasta() {
         <text class="axis" x="${P.l}" y="${H - 6}">${ini[0]}</text>
         <text class="axis" x="${W - P.r}" y="${H - 6}" text-anchor="end">${hoy[0]}</text>`;
   document.getElementById('basket-chart').innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Costo unitario de ${nombre}">${g}</svg>`;
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Unit cost of ${nombre}">${g}</svg>`;
 
-  // Exposicion: barras horizontales, ordenadas. Responde "si cubro uno, cuanto me queda".
+  // Exposure: horizontal bars, sorted. Answers "if I hedge one, how much is left".
   const comps = [...d.components].sort((a, b) => (b.share_pct || 0) - (a.share_pct || 0));
   document.getElementById('basket-expo').innerHTML = `
-    <h2 style="font-size:13px;margin:0 0 3px">De qué depende tu costo</h2>
-    <p class="note">Cubrir un insumo que pesa 0,1% no cambia nada. Esta es la lista que
-      dice dónde mirar.</p>
-    <table><thead><tr><th>insumo</th><th>cantidad</th><th>costo</th><th>peso</th><th style="width:34%"></th></tr></thead><tbody>
+    <h2 style="font-size:13px;margin:0 0 3px">What your cost depends on</h2>
+    <p class="note">Hedging an input that weighs 0.1% changes nothing. This is the list that
+      says where to look.</p>
+    <table><thead><tr><th>input</th><th>quantity</th><th>cost</th><th>weight</th><th style="width:34%"></th></tr></thead><tbody>
     ${comps.map((x, i) => `<tr>
       <td><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:${css(S[i % 8])};margin-right:7px"></span>${x.symbol}</td>
       <td>${fmt(x.qty, 1)} ${x.qty_unit}</td>
@@ -605,20 +605,20 @@ async function canasta() {
         <div style="width:${(x.share_pct || 0).toFixed(1)}%;background:${css(S[i % 8])};height:9px;border-radius:3px"></div></div></td>
     </tr>`).join('')}</tbody></table>`;
 
-  // Escenario
+  // Scenario
   ESC = {};
   document.getElementById('basket-esc').innerHTML = `
-    <h2 style="font-size:13px;margin:0 0 3px">Qué pasa si…</h2>
-    <p class="note">Moveé un insumo y mirá el impacto en el costo total. Los demás quedan
-      quietos: propagar el movimiento vía correlación convertiría un escenario explícito
-      en un pronóstico encubierto.</p>
+    <h2 style="font-size:13px;margin:0 0 3px">What if…</h2>
+    <p class="note">Move an input and watch the impact on total cost. The others stay put:
+      propagating the move via correlation would turn an explicit scenario into a covert
+      forecast.</p>
     <div style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end">
       ${comps.map(x => `<label style="font-size:12px;color:var(--text-2)">${x.symbol}
         <input type="range" min="-40" max="40" value="0" step="1" data-sym="${x.symbol}"
           style="display:block;width:150px;margin-top:5px">
         <span data-out="${x.symbol}" style="font-variant-numeric:tabular-nums">0%</span></label>`).join('')}
       <div style="margin-left:auto;text-align:right">
-        <div class="k" style="color:var(--text-3);font-size:10.5px;text-transform:uppercase">impacto en el costo</div>
+        <div class="k" style="color:var(--text-3);font-size:10.5px;text-transform:uppercase">impact on cost</div>
         <div id="esc-out" style="font-size:22px;font-variant-numeric:tabular-nums">—</div>
       </div>
     </div>`;
@@ -639,10 +639,10 @@ async function canasta() {
   });
 }
 
-/* Senal de compra. Lo central del panel NO es la banda sino la VENTAJA MEDIDA: una banda
-   que dice "muy barato" con ventaja negativa significa que, para ese instrumento, comprar
-   barato salio historicamente PEOR que comprar en un dia cualquiera. Mostrar la banda sin
-   la ventaja convertiria una medicion honesta en un consejo falso. */
+/* Buy signal. The centre of this panel is NOT the band but the MEASURED EDGE: a band
+   reading "very cheap" with a negative edge means that, for that instrument, buying cheap
+   historically came out WORSE than buying on any random day. Showing the band without the
+   edge would turn an honest measurement into false advice. */
 async function senal(sym) {
   const cont = document.getElementById('signal');
   const d = await (await fetch(`/api/signal?symbol=${sym}&horizon=60`)).json();
@@ -650,7 +650,7 @@ async function senal(sym) {
 
   const pos = d.pos_rango_252d, v = d.ventaja_pct;
   const barato = pos < .4;
-  // El color lo decide la EVIDENCIA, no la banda. Sin ventaja medible es gris.
+  // Colour is decided by the EVIDENCE, not the band. With no measurable edge it is grey.
   const util = v != null && Math.abs(v) >= 1.0;
   const col = !util ? 'var(--text-3)' : v > 0 ? css('--good') : css('--critical');
 
@@ -663,35 +663,35 @@ async function senal(sym) {
   });
   const px = m + pos * (W - m * 2);
   g += `<circle cx="${px}" cy="18.5" r="7" fill="${css('--s1')}" stroke="var(--surface-1)" stroke-width="2"/>
-        <text x="${m}" y="40" class="axis">mínimo del año</text>
-        <text x="${W-m}" y="40" class="axis" text-anchor="end">máximo del año</text>`;
+        <text x="${m}" y="40" class="axis">year low</text>
+        <text x="${W-m}" y="40" class="axis" text-anchor="end">year high</text>`;
 
   cont.innerHTML = `
     <div class="tiles" style="margin-bottom:14px">
-      <div class="tile"><div class="k">estado hoy</div>
+      <div class="tile"><div class="k">state today</div>
         <div class="v" style="font-size:15px">${d.etiqueta}</div></div>
-      <div class="tile"><div class="k">posición en el rango</div>
+      <div class="tile"><div class="k">position in range</div>
         <div class="v">${(pos*100).toFixed(0)}%</div></div>
-      <div class="tile"><div class="k">ventaja histórica</div>
+      <div class="tile"><div class="k">historical edge</div>
         <div class="v" style="color:${col}">${v == null ? '—' : (v>0?'+':'')+v.toFixed(1)+' pts'}</div></div>
-      <div class="tile"><div class="k">casos medidos</div>
+      <div class="tile"><div class="k">cases measured</div>
         <div class="v">${d.n_historico ?? '—'}</div></div>
     </div>
     <svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:100%"
-      role="img" aria-label="Posición del precio en su rango de 52 semanas">${g}</svg>
+      role="img" aria-label="Price position within its 52-week range">${g}</svg>
     <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-2);line-height:1.55">${d.lectura || ''}</p>
     <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:${col}">
       <strong>${!util
-        ? 'Sin ventaja medible: para este instrumento la señal no aporta nada. Comprá por calendario.'
+        ? 'No measurable edge: for this instrument the signal adds nothing. Buy on a calendar.'
         : v > 0
-          ? 'Históricamente, comprar en esta banda salió mejor que comprar sin mirar.'
-          : 'Ojo: históricamente, comprar en esta banda salió PEOR que comprar sin mirar. La intuición está invertida acá.'}</strong></p>
+          ? 'Historically, buying in this band came out better than buying without looking.'
+          : 'Careful: historically, buying in this band came out WORSE than buying without looking. Intuition is inverted here.'}</strong></p>
     <p class="note" style="margin-top:10px">${d.advertencia}</p>`;
 }
 
-/* Matriz de correlacion — escala DIVERGENTE (azul ↔ rojo, gris en el medio).
-   Es polaridad: -1 y +1 son opuestos y el 0 es "nada". Una escala secuencial aca
-   mentiria, porque pintaria -1 y 0 como si fueran vecinos. */
+/* Correlation matrix — DIVERGING scale (blue ↔ red, grey in the middle).
+   This is polarity: -1 and +1 are opposites and 0 is "nothing". A sequential scale here
+   would lie, painting -1 and 0 as if they were neighbours. */
 function correlacion(data) {
   const syms = data.symbols, m = {};
   data.matrix.forEach(x => { m[x.a + '|' + x.b] = x.r; });
@@ -720,10 +720,10 @@ function correlacion(data) {
   document.getElementById('corr').innerHTML =
     `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}"
        style="width:${W}px;max-width:100%;height:auto"
-       role="img" aria-label="Matriz de correlación de retornos diarios">${g}</svg></div>
-     <div class="legend"><span><i style="background:${css('--s1')}"></i>se mueven juntos (+)</span>
-       <span><i style="background:${css('--s8')}"></i>se mueven al revés (−)</span>
-       <span><i style="background:var(--surface-2)"></i>sin relación (0)</span></div>`;
+       role="img" aria-label="Correlation matrix of daily returns">${g}</svg></div>
+     <div class="legend"><span><i style="background:${css('--s1')}"></i>move together (+)</span>
+       <span><i style="background:${css('--s8')}"></i>move opposite (−)</span>
+       <span><i style="background:var(--surface-2)"></i>no relationship (0)</span></div>`;
 }
 
 init();

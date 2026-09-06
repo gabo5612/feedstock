@@ -1,9 +1,9 @@
-"""Contrato de una fuente de datos.
+"""Contract for a data source.
 
-El ingester habla SOLO con esta interfaz. Cambiar a un feed pago, o al LME real, es
-escribir una clase — no reescribir el sistema. Es lo que hace honesto usar la chart API de
-Yahoo, que es no oficial y sin contrato de servicio: sirve para un portfolio, y el dia que
-haga falta produccion se reemplaza sin tocar nada mas.
+The ingester talks ONLY to this interface. Switching to a paid feed, or to real LME data, is
+writing a class — not rewriting the system. That is what makes it honest to use Yahoo's
+chart API, which is unofficial and carries no service contract: fine for a portfolio, and
+the day production is needed it gets replaced without touching anything else.
 """
 
 from __future__ import annotations
@@ -14,7 +14,7 @@ from typing import Protocol
 
 
 class SourceError(RuntimeError):
-    """La fuente no entrego datos usables. Nunca se escribe nada tras uno de estos."""
+    """The source returned no usable data. Nothing is ever written after one of these."""
 
 
 @dataclass(frozen=True)
@@ -31,7 +31,7 @@ class SourceAdapter(Protocol):
     name: str
 
     def display_name(self, ticker: str) -> str:
-        """Nombre que la fuente da al instrumento. Se compara contra `expect_name`."""
+        """The name the source gives the instrument. Compared against `expect_name`."""
         ...
 
     def fetch(self, ticker: str, start: datetime, end: datetime, interval: str) -> list[Bar]:

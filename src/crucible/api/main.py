@@ -1,8 +1,8 @@
-"""API del dashboard. Sirve la pagina y los datos, todo desde la maquina local.
+"""Dashboard API. Serves the page and the data, all from the local machine.
 
-No hay servicio externo ni telemetria: la pagina se sirve del mismo proceso que lee la
-base. Es el mismo criterio que el resto del proyecto — los datos no salen de la maquina —
-y ademas es lo que permite que esto funcione en una planta sin internet.
+There is no external service and no telemetry: the page is served by the same process that
+reads the database. It is the same criterion as the rest of the project — the data does not
+leave the machine — and it is also what lets this work in a plant with no internet.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ def health() -> JSONResponse:
 
 @app.get("/api/instruments")
 def instruments() -> list[dict]:
-    """Cada instrumento con su ultimo precio y su variacion. Alimenta la lista lateral."""
+    """Every instrument with its latest price and change. Feeds the sidebar list."""
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             WITH ult AS (
@@ -64,21 +64,21 @@ def instruments() -> list[dict]:
               FROM core.instrument i
               LEFT JOIN ult u ON u.symbol = i.symbol
              ORDER BY i.asset_class, i.symbol""")
-        filas = cur.fetchall()
+        rows = cur.fetchall()
 
-    salida = []
-    for sym, nombre, clase, unidad, moneda, ultimo, fecha, hace30, n, desde in filas:
-        cambio = None
-        if ultimo is not None and hace30:
-            cambio = (ultimo - hace30) / hace30 * 100
-        salida.append({
-            "symbol": sym, "name": nombre, "asset_class": clase,
-            "unit": unidad, "currency": moneda,
-            "last": ultimo, "last_date": str(fecha) if fecha else None,
-            "change_30d_pct": cambio, "bars": n,
-            "since": str(desde) if desde else None,
+    out = []
+    for sym, name, asset_class, unit, currency, last, date_, month_ago, n, since in rows:
+        change = None
+        if last is not None and month_ago:
+            change = (last - month_ago) / month_ago * 100
+        out.append({
+            "symbol": sym, "name": name, "asset_class": asset_class,
+            "unit": unit, "currency": currency,
+            "last": last, "last_date": str(date_) if date_ else None,
+            "change_30d_pct": change, "bars": n,
+            "since": str(since) if since else None,
         })
-    return salida
+    return out
 
 
 @app.get("/api/series")
@@ -86,51 +86,51 @@ def series(
     symbols: str = Query(..., description="lista separada por comas"),
     days: int = Query(365, ge=5, le=4000),
 ) -> dict:
-    """Series de cierre para los simbolos pedidos.
+    """Close series for the requested symbols.
 
-    Devuelve los valores CRUDOS. La indexacion a base 100 se hace en el cliente, y esa
-    decision es deliberada: quien mire el JSON ve precios, no una transformacion que
-    tendria que deducir.
+    Returns RAW values. Indexing to base 100 happens in the client, and that decision is
+    deliberate: whoever looks at the JSON sees prices, not a transformation they would have
+    to infer.
     """
-    pedidos = [s.strip() for s in symbols.split(",") if s.strip()]
-    if not pedidos:
-        raise HTTPException(400, "sin simbolos")
-    if len(pedidos) > 8:
-        # Ocho es el tope de la paleta categorica validada. Un noveno color no se
-        # inventa: se recorta la seleccion.
-        raise HTTPException(400, "maximo 8 series a la vez")
+    requested = [s.strip() for s in symbols.split(",") if s.strip()]
+    if not requested:
+        raise HTTPException(400, "no symbols given")
+    if len(requested) > 8:
+        # Eight is the ceiling of the validated categorical palette. A ninth colour is not
+        # invented: the selection is trimmed.
+        raise HTTPException(400, "at most 8 series at a time")
 
-    desde = datetime.now(timezone.utc) - timedelta(days=days)
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT symbol, ts::date, close
               FROM core.bar
              WHERE symbol = ANY(%s) AND interval='1d' AND ts >= %s AND close IS NOT NULL
              ORDER BY symbol, ts""",
-            (pedidos, desde))
-        filas = cur.fetchall()
+            (requested, since))
+        rows = cur.fetchall()
 
-    por_symbol: dict[str, list] = {s: [] for s in pedidos}
-    for sym, f, close in filas:
-        por_symbol[sym].append([str(f), float(close)])
-    return {"days": days, "series": por_symbol}
+    by_symbol: dict[str, list] = {s: [] for s in requested}
+    for sym, f, close in rows:
+        by_symbol[sym].append([str(f), float(close)])
+    return {"days": days, "series": by_symbol}
 
 
 @app.get("/api/stats")
 def stats(symbol: str, days: int = Query(365, ge=5, le=4000)) -> dict:
-    """Estadisticas de un instrumento en la ventana pedida."""
-    desde = datetime.now(timezone.utc) - timedelta(days=days)
+    """Statistics for one instrument over the requested window."""
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             SELECT count(*), min(low), max(high), min(ts)::date, max(ts)::date,
                    stddev_samp(close), avg(close)
               FROM core.bar
              WHERE symbol=%s AND interval='1d' AND ts >= %s AND close IS NOT NULL""",
-            (symbol, desde))
-        n, minimo, maximo, ini, fin, desvio, media = cur.fetchone()
+            (symbol, since))
+        n, low, high, first, last, stdev, mean_ = cur.fetchone()
 
-        # Volatilidad anualizada sobre retornos logaritmicos diarios. 252 = dias habiles
-        # de mercado en un ano, la convencion estandar.
+        # Annualised volatility over daily log returns. 252 = market business days in a
+        # year, the standard convention.
         cur.execute("""
             WITH r AS (
               SELECT ln(close / lag(close) OVER (ORDER BY ts)) AS ret
@@ -138,31 +138,31 @@ def stats(symbol: str, days: int = Query(365, ge=5, le=4000)) -> dict:
                WHERE symbol=%s AND interval='1d' AND ts >= %s AND close > 0
             )
             SELECT stddev_samp(ret) * sqrt(252) * 100 FROM r WHERE ret IS NOT NULL""",
-            (symbol, desde))
+            (symbol, since))
         vol = cur.fetchone()[0]
 
     if not n:
-        raise HTTPException(404, f"sin datos para {symbol}")
+        raise HTTPException(404, f"no data for {symbol}")
     return {
         "symbol": symbol, "bars": n,
-        "min": minimo, "max": maximo, "avg": media,
-        "from": str(ini), "to": str(fin),
+        "min": low, "max": high, "avg": mean_,
+        "from": str(first), "to": str(last),
         "annualized_vol_pct": vol,
     }
 
 
 @app.get("/api/correlation")
 def correlation(symbols: str, days: int = Query(365, ge=30, le=4000)) -> dict:
-    """Correlacion de retornos diarios entre instrumentos.
+    """Correlation of daily returns between instruments.
 
-    Es la pregunta que de verdad le importa a una planta: **que se mueve junto**. Si el
-    cobre y la energia estan correlacionados, cubrir uno no cubre el otro.
+    This is the question a plant actually cares about: **what moves together**. If copper and
+    energy are correlated, hedging one does not hedge the other.
 
-    Sobre RETORNOS, no sobre precios: dos series con tendencia dan correlacion alta
-    aunque no tengan nada que ver — la trampa clasica de este calculo.
+    Over RETURNS, not prices: two trending series correlate highly even when unrelated — the
+    classic trap of this calculation.
     """
-    pedidos = [s.strip() for s in symbols.split(",") if s.strip()]
-    desde = datetime.now(timezone.utc) - timedelta(days=days)
+    requested = [s.strip() for s in symbols.split(",") if s.strip()]
+    since = datetime.now(timezone.utc) - timedelta(days=days)
     with _conn() as c, c.cursor() as cur:
         cur.execute("""
             WITH r AS (
@@ -175,17 +175,17 @@ def correlation(symbols: str, days: int = Query(365, ge=30, le=4000)) -> dict:
               FROM r a JOIN r b ON a.ts = b.ts
              WHERE a.ret IS NOT NULL AND b.ret IS NOT NULL
              GROUP BY 1,2""",
-            (pedidos, desde))
-        filas = cur.fetchall()
+            (requested, since))
+        rows = cur.fetchall()
     return {
-        "symbols": pedidos,
-        "matrix": [{"a": a, "b": b, "r": r, "n": n} for a, b, r, n in filas],
+        "symbols": requested,
+        "matrix": [{"a": a, "b": b, "r": r, "n": n} for a, b, r, n in rows],
     }
 
 
 @app.get("/api/signal")
 def signal(symbol: str, horizon: int = Query(60, ge=5, le=252)) -> dict:
-    """Donde esta el precio respecto de su historia, y que paso despues historicamente."""
+    """Where the price sits relative to its history, and what happened afterwards."""
     from ..signals import recomendacion
 
     return recomendacion(symbol, horizonte=horizon)
@@ -220,7 +220,7 @@ def basket_scenario(payload: dict) -> dict:
 
     nombre = payload.get("name")
     if not nombre:
-        raise HTTPException(400, "falta `name`")
+        raise HTTPException(400, "`name` is required")
     return escenario(nombre, payload.get("shocks") or {})
 
 

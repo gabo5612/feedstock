@@ -1,9 +1,9 @@
--- Esquema de crucible. Se aplica una sola vez, al inicializar el volumen.
+-- crucible schema. Applied once, when the volume is initialised.
 --
--- La division en capas no es cosmetica: `raw` es append-only y sagrada, y todo lo demas
--- se reconstruye desde ahi. Si una normalizacion resulta estar mal, se corrige y se
--- reconstruye `core` sin volver a pedirle nada a la fuente — que ademas puede haber
--- cambiado o desaparecido.
+-- The split into layers is not cosmetic: `raw` is append-only and sacred, and everything
+-- else is rebuilt from it. If a normalisation turns out to be wrong, it is corrected and
+-- `core` is rebuilt without asking the source for anything again — a source that may well
+-- have changed or disappeared.
 
 CREATE EXTENSION IF NOT EXISTS timescaledb;
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -13,9 +13,9 @@ CREATE SCHEMA IF NOT EXISTS core;
 CREATE SCHEMA IF NOT EXISTS feat;
 CREATE SCHEMA IF NOT EXISTS model;
 
--- ── CAPA CRUDA ────────────────────────────────────────────────────────────
--- Nunca se modifica. La PK hace la reingesta idempotente: correr el ingester dos veces
--- sobre el mismo tramo no duplica una sola fila.
+-- ── RAW LAYER ─────────────────────────────────────────────────────────────
+-- Never modified. The PK makes re-ingestion idempotent: running the ingester twice over
+-- the same range does not duplicate a single row.
 CREATE TABLE IF NOT EXISTS raw.ohlcv_ingest (
     source        text        NOT NULL,
     symbol        text        NOT NULL,
@@ -34,15 +34,15 @@ CREATE TABLE IF NOT EXISTS raw.ohlcv_ingest (
 
 SELECT create_hypertable('raw.ohlcv_ingest', 'ts', if_not_exists => TRUE);
 
--- ── REGISTRO DE INSTRUMENTOS ──────────────────────────────────────────────
+-- ── INSTRUMENT REGISTRY ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS core.instrument (
     symbol                text PRIMARY KEY,
     source                text NOT NULL,
     source_ticker         text NOT NULL,
-    -- Verificado contra la respuesta de la fuente, no contra el ticker a secas.
-    -- ZN=F NO es zinc: es el futuro del bono del Tesoro a 10 anos. Meterlo en un dataset
-    -- de metales contaminaria el modelo entero SIN ERROR VISIBLE. Por eso el nombre que
-    -- devuelve la fuente se guarda y se compara.
+    -- Verified against the source's response, not against the bare ticker.
+    -- ZN=F is NOT zinc: it is the 10-year Treasury note future. Putting it in a metals
+    -- dataset would contaminate the whole model WITH NO VISIBLE ERROR. Hence the name the
+    -- source returns is stored and compared.
     display_name_verified text NOT NULL,
     asset_class           text NOT NULL,
     unit                  text,
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS core.instrument (
     verified_at           timestamptz
 );
 
--- ── CAPA NORMALIZADA ──────────────────────────────────────────────────────
+-- ── NORMALISED LAYER ──────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS core.bar (
     symbol   text        NOT NULL REFERENCES core.instrument(symbol),
     interval text        NOT NULL,
@@ -60,8 +60,8 @@ CREATE TABLE IF NOT EXISTS core.bar (
     low      double precision,
     close    double precision,
     volume   double precision,
-    -- Un hueco marcado es un hueco conocido. Un hueco silencioso se interpola sin querer
-    -- y termina siendo una feature inventada.
+    -- A flagged gap is a known gap. A silent gap gets interpolated by accident and ends
+    -- up as an invented feature.
     is_gap   boolean     NOT NULL DEFAULT false,
     PRIMARY KEY (symbol, interval, ts)
 );
@@ -74,15 +74,15 @@ CREATE TABLE IF NOT EXISTS feat.feature (
     ts              timestamptz NOT NULL,
     name            text        NOT NULL,
     value           double precision,
-    -- Dos predicciones solo son comparables si comparten feature_version. Sin esto, un
-    -- cambio de definicion de feature convierte una comparacion en una coincidencia.
+    -- Two predictions are only comparable if they share feature_version. Without this, a
+    -- change in a feature's definition turns a comparison into a coincidence.
     feature_version text        NOT NULL,
     PRIMARY KEY (symbol, ts, name, feature_version)
 );
 
 SELECT create_hypertable('feat.feature', 'ts', if_not_exists => TRUE);
 
--- ── MODELOS ───────────────────────────────────────────────────────────────
+-- ── MODELS ────────────────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS model.run (
     run_id          bigserial PRIMARY KEY,
     model           text NOT NULL,
@@ -96,8 +96,8 @@ CREATE TABLE IF NOT EXISTS model.run (
 CREATE TABLE IF NOT EXISTS model.prediction (
     run_id    bigint      NOT NULL REFERENCES model.run(run_id) ON DELETE CASCADE,
     symbol    text        NOT NULL,
-    -- origin_ts es el corte: el modelo que produjo esta fila NUNCA vio datos posteriores.
-    -- El guard de fuga en CI verifica exactamente eso, feature por feature.
+    -- origin_ts is the cut-off: the model that produced this row NEVER saw later data.
+    -- The leakage guard in CI verifies exactly that, feature by feature.
     origin_ts timestamptz NOT NULL,
     horizon   int         NOT NULL,
     yhat      double precision,

@@ -1,8 +1,8 @@
-"""Inspeccion rapida de lo ingerido, sin pelear con docker ni psql.
+"""Quick inspection of what was ingested, without fighting docker or psql.
 
-    python3 scripts/ver.py                  # resumen de los 12 instrumentos
-    python3 scripts/ver.py copper           # ultimas 20 velas del cobre
-    python3 scripts/ver.py copper 60        # ultimas 60
+    python3 scripts/ver.py                  # summary of all 12 instruments
+    python3 scripts/ver.py copper           # last 20 copper candles
+    python3 scripts/ver.py copper 60        # last 60
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ import psycopg  # noqa: E402
 DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
 
 
-def resumen(cur) -> None:
+def summary(cur) -> None:
     cur.execute("""
         SELECT i.symbol, i.display_name_verified, i.asset_class,
                count(b.*), min(b.ts)::date, max(b.ts)::date,
@@ -26,27 +26,27 @@ def resumen(cur) -> None:
           FROM core.instrument i
           LEFT JOIN core.bar b ON b.symbol = i.symbol
          GROUP BY 1,2,3 ORDER BY 1""")
-    print(f"\n{'instrumento':<18}{'nombre verificado':<28}{'clase':<14}{'velas':>7}"
-          f"{'huecos':>8}  rango")
+    print(f"\n{'instrument':<18}{'verified name':<28}{'class':<14}{'candles':>7}"
+          f"{'gaps':>8}  range")
     print("─" * 100)
-    for sym, nombre, clase, n, ini, fin, huecos in cur.fetchall():
-        rango = f"{ini} → {fin}" if ini else "—"
-        print(f"{sym:<18}{(nombre or '')[:26]:<28}{clase:<14}{n:>7}{huecos:>8}  {rango}")
+    for sym, name, cls, n, first, last, gaps in cur.fetchall():
+        rng = f"{first} → {last}" if first else "—"
+        print(f"{sym:<18}{(name or '')[:26]:<28}{cls:<14}{n:>7}{gaps:>8}  {rng}")
     print("─" * 100)
     cur.execute("SELECT count(*) FROM raw.ohlcv_ingest")
-    print(f"{cur.fetchone()[0]} filas en raw (la capa cruda, que nunca se modifica)\n")
+    print(f"{cur.fetchone()[0]} rows in raw (the raw layer, never modified)\n")
 
 
-def velas(cur, symbol: str, n: int) -> None:
+def candles(cur, symbol: str, n: int) -> None:
     cur.execute(
         "SELECT display_name_verified FROM core.instrument WHERE symbol=%s", (symbol,)
     )
-    fila = cur.fetchone()
-    if not fila:
-        print(f"\n'{symbol}' no existe. Corre sin argumentos para ver los disponibles.\n")
+    row = cur.fetchone()
+    if not row:
+        print(f"\n'{symbol}' does not exist. Run without arguments to list what is available.\n")
         return
-    print(f"\n{symbol} — {fila[0]}   (ultimas {n} velas)")
-    print(f"\n{'fecha':<14}{'apertura':>11}{'maximo':>11}{'minimo':>11}{'cierre':>11}")
+    print(f"\n{symbol} — {row[0]}   (last {n} candles)")
+    print(f"\n{'date':<14}{'open':>11}{'high':>11}{'low':>11}{'close':>11}")
     print("─" * 58)
     cur.execute(
         """SELECT ts::date, open, high, low, close FROM core.bar
@@ -56,19 +56,19 @@ def velas(cur, symbol: str, n: int) -> None:
     for f, o, h, l, c in cur.fetchall():
         fmt = lambda v: "—" if v is None else f"{v:,.4f}".rstrip("0").rstrip(".")
         print(f"{str(f):<14}{fmt(o):>11}{fmt(h):>11}{fmt(l):>11}{fmt(c):>11}")
-    print("\nContrastalo contra finance.yahoo.com: tiene que dar igual.\n")
+    print("\nCheck it against finance.yahoo.com: it has to match.\n")
 
 
 def main(argv: list[str]) -> int:
     try:
         with psycopg.connect(DSN, connect_timeout=5) as conn, conn.cursor() as cur:
             if argv:
-                velas(cur, argv[0], int(argv[1]) if len(argv) > 1 else 20)
+                candles(cur, argv[0], int(argv[1]) if len(argv) > 1 else 20)
             else:
-                resumen(cur)
+                summary(cur)
     except psycopg.OperationalError as exc:
-        print(f"\nNo pude conectar a la base: {exc}")
-        print("¿Esta levantada?  cd crucible && docker-compose up -d\n")
+        print(f"\nCould not connect to the database: {exc}")
+        print("Is it running?  cd crucible && docker-compose up -d\n")
         return 2
     return 0
 

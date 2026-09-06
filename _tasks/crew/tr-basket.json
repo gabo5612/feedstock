@@ -1,0 +1,23 @@
+{
+  "id": "tr-basket",
+  "kind": "mechanical-edit",
+  "contract": "Traduce al INGLES todo el texto en espanol del archivo src/crucible/basket.py.\n\nQUE TRADUCIR: el docstring del modulo, todos los docstrings de clases y funciones, todos los comentarios, y los strings de texto que ve un usuario.\n\nREGLA CRITICA — NO RENOMBRES NADA. Ni una clase, ni una funcion, ni una variable, ni un campo de dataclass, ni una clave de diccionario, ni una constante. Solo cambias TEXTO dentro de comillas y dentro de comentarios. Renombrar cualquier identificador rompe el codigo que lo importa desde otro archivo y el trabajo se rechaza automaticamente.\n\nTampoco toques: el SQL dentro de las triple comillas que se pasa a cur.execute, los nombres de columna, los imports, ni la logica.\n\nEl ingles tiene que ser natural y tecnico, no literal palabra por palabra. Los comentarios de este proyecto explican POR QUE algo se hace de una forma y no de otra, y casi siempre hay un bug real o una decision defendible detras: esa explicacion es lo mas valioso del archivo y tiene que sobrevivir la traduccion completa, sin resumirla.\n\nEnvolve las lineas a un maximo de 90 caracteres, como el resto del proyecto.\n\nNo agregues ni quites codigo. No cambies el comportamiento.",
+  "files": [
+    "src/crucible/basket.py"
+  ],
+  "creates": [],
+  "mustNotTouch": [
+    "tests/",
+    "scripts/check_english.py"
+  ],
+  "acceptance": [
+    "check_english.py pasa sobre el archivo",
+    "el modulo importa y sus simbolos publicos siguen existiendo"
+  ],
+  "verify": [
+    ".venv/bin/python scripts/check_english.py src/crucible/basket.py",
+    ".venv/bin/python -c \"import sys; sys.path.insert(0,'src'); from crucible.basket import cargar, serie_costo, escenario, listar; d=serie_costo('producto-base',days=90); assert d['series'] and 'components' in d; e=escenario('producto-base',{'copper':10}); assert 'delta_pct' in e; print('ok')\""
+  ],
+  "maxAttempts": 3,
+  "parallelSafe": false
+}

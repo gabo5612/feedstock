@@ -1,18 +1,18 @@
-"""Features. Todas causales, y hay un test que lo prueba.
+"""Features. All causal, and there is a test that proves it.
 
-**La regla que gobierna este archivo entero:** una feature en `ts` solo puede usar datos
-con timestamp <= `ts`. Ni uno posterior, ni siquiera el propio cierre de `ts` cuando la
-feature pretende estar disponible *antes* del cierre.
+**The rule governing this entire file:** a feature at `ts` may only use data with a
+timestamp <= `ts`. Not one later, not even `ts`'s own close when the feature claims to be
+available *before* the close.
 
-El look-ahead bias es lo que hace que el 95% de los proyectos de prediccion de precios
-sean basura con graficos preciosos: se calcula una media movil centrada, o se normaliza
-con la media de toda la serie, y el modelo "predice" usando informacion que en ese momento
-no existia. El resultado se ve espectacular y no se puede reproducir en vivo ni una vez.
+Look-ahead bias is what makes 95% of price-prediction projects garbage with beautiful
+charts: someone computes a centred moving average, or normalises with the whole series'
+mean, and the model "predicts" using information that did not exist at that moment. The
+result looks spectacular and cannot be reproduced live even once.
 
-Acá todas las ventanas son hacia atras (`rows BETWEEN n PRECEDING AND CURRENT ROW`) y el
-guard de `tests/test_leak.py` lo verifica de forma independiente: recalcula cada feature
-truncando la serie en cada `origin_ts` y exige el mismo valor. Si alguna mira adelante, el
-truncado da distinto y el test falla.
+Here every window looks backwards (`rows BETWEEN n PRECEDING AND CURRENT ROW`) and the guard
+in `tests/test_leak.py` verifies it independently: it recomputes each feature truncating the
+series at each `origin_ts` and requires the same value. If one looks ahead, the truncated
+version differs and the test fails.
 """
 
 from __future__ import annotations
@@ -24,13 +24,13 @@ import psycopg
 
 DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
 
-# Cambia cuando cambia la DEFINICION de una feature, no cuando se agregan filas. Dos
-# predicciones solo son comparables si comparten esta version: sin ella, un cambio de
-# definicion convierte una comparacion en una coincidencia.
+# Changes when a feature's DEFINITION changes, not when rows are added. Two predictions are
+# only comparable if they share this version: without it, a change of definition turns a
+# comparison into a coincidence.
 FEATURE_VERSION = "v1"
 
-# Ventanas en dias habiles de mercado.
-VENTANAS = (20, 60, 252)
+# Windows in market business days.
+WINDOWS = (20, 60, 252)
 
 
 @dataclass
@@ -40,8 +40,8 @@ class FeatureReport:
     names: tuple[str, ...]
 
 
-# Todas las ventanas son `n PRECEDING AND CURRENT ROW`: hacia atras e incluyendo hoy.
-# Una ventana centrada (`n PRECEDING AND n FOLLOWING`) seria fuga pura.
+# Every window is `n PRECEDING AND CURRENT ROW`: backwards, including today.
+# A centred window (`n PRECEDING AND n FOLLOWING`) would be pure leakage.
 SQL_FEATURES = """
 WITH base AS (
   SELECT symbol, ts, close,
@@ -60,9 +60,9 @@ calc AS (
          max(close) OVER w252 AS max_252,
          avg(close) OVER w252 AS sma_252,
          stddev_samp(close) OVER w252 AS sd_252,
-         -- Rango percentil dentro de la propia historia reciente: 0 = el mas barato de
-         -- los ultimos 252 dias habiles, 1 = el mas caro. Es la base de la senal de
-         -- compra, y es una DESCRIPCION del presente, no un pronostico.
+         -- Percentile rank within its own recent history: 0 = the cheapest of the last
+         -- 252 business days, 1 = the most expensive. This is the basis of the buy
+         -- signal, and it is a DESCRIPTION of the present, not a forecast.
          percent_rank() OVER (PARTITION BY symbol ORDER BY ts
                               ROWS BETWEEN 251 PRECEDING AND CURRENT ROW) AS _ignorado
     FROM base
@@ -77,27 +77,27 @@ SELECT symbol, ts, close, ret, sma_20, sma_60, sma_252, vol_20, vol_60,
 """
 
 
-def _derivadas(fila: dict) -> dict[str, float | None]:
-    """Features derivadas de las agregadas. Aritmetica sobre la misma fila: no puede fugar."""
-    close = fila["close"]
+def _derived(row: dict) -> dict[str, float | None]:
+    """Features derived from the aggregates. Arithmetic on the same row: it cannot leak."""
+    close = row["close"]
     out: dict[str, float | None] = {
-        "ret_1d": fila["ret"],
-        "vol_20d": fila["vol_20"],
-        "vol_60d": fila["vol_60"],
+        "ret_1d": row["ret"],
+        "vol_20d": row["vol_20"],
+        "vol_60d": row["vol_60"],
     }
     for n in (20, 60, 252):
-        sma = fila.get(f"sma_{n}")
+        sma = row.get(f"sma_{n}")
         out[f"sma_{n}d"] = sma
-        # Distancia relativa a su media: cuanto por encima o por debajo esta hoy.
+        # Relative distance from its mean: how far above or below it sits today.
         out[f"dist_sma_{n}d"] = (close / sma - 1) if sma else None
 
-    lo, hi = fila["min_252"], fila["max_252"]
-    # Posicion en el rango de 52 semanas. 0 = minimo del ano, 1 = maximo.
+    lo, hi = row["min_252"], row["max_252"]
+    # Position in the 52-week range. 0 = year low, 1 = year high.
     out["pos_rango_252d"] = ((close - lo) / (hi - lo)) if (lo is not None and hi and hi > lo) else None
 
-    sd, media = fila["sd_252"], fila["sma_252"]
-    # Z-score contra su propia historia anual.
-    out["z_252d"] = ((close - media) / sd) if (sd and media is not None) else None
+    sd, mean_ = row["sd_252"], row["sma_252"]
+    # Z-score against its own annual history.
+    out["z_252d"] = ((close - mean_) / sd) if (sd and mean_ is not None) else None
     return out
 
 
@@ -106,26 +106,26 @@ def compute(symbol: str, *, dsn: str = DSN, persist: bool = True) -> FeatureRepo
         with conn.cursor() as cur:
             cur.execute(SQL_FEATURES, {"symbol": symbol})
             cols = [d.name for d in cur.description]
-            filas = [dict(zip(cols, r)) for r in cur.fetchall()]
+            rows = [dict(zip(cols, r)) for r in cur.fetchall()]
 
-            registros = []
-            for f in filas:
-                for nombre, valor in _derivadas(f).items():
-                    if valor is not None:
-                        registros.append((symbol, f["ts"], nombre, float(valor), FEATURE_VERSION))
+            records = []
+            for f in rows:
+                for name, value in _derived(f).items():
+                    if value is not None:
+                        records.append((symbol, f["ts"], name, float(value), FEATURE_VERSION))
 
-            if persist and registros:
+            if persist and records:
                 cur.executemany(
                     """INSERT INTO feat.feature (symbol, ts, name, value, feature_version)
                        VALUES (%s,%s,%s,%s,%s)
                        ON CONFLICT (symbol, ts, name, feature_version)
                        DO UPDATE SET value = EXCLUDED.value""",
-                    registros,
+                    records,
                 )
         conn.commit()
 
-    nombres = tuple(sorted({r[2] for r in registros}))
-    return FeatureReport(symbol=symbol, rows=len(registros), names=nombres)
+    names = tuple(sorted({r[2] for r in records}))
+    return FeatureReport(symbol=symbol, rows=len(records), names=names)
 
 
 def compute_all(symbols, **kw) -> list[FeatureReport]:

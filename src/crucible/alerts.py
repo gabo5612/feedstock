@@ -1,14 +1,14 @@
-"""Alertas sobre umbrales. Corren locales, sin servicio externo.
+"""Alerts on thresholds. Run locally, no external service.
 
-Dos decisiones que hacen que un sistema de alertas se siga leyendo a los seis meses:
+Two decisions that make an alert system continue reading every six months:
 
-**1. Se registra la TRANSICION, no la evaluacion.** Una tabla que anota "sigue disparada"
-todos los dias se vuelve ilegible en una semana y la gente deja de mirarla. Solo se escribe
-cuando una regla pasa de tranquila a disparada o al reves.
+**1. Log the TRANSITION, not the evaluation.** A table that notes "still firing"
+every day becomes unreadable in a week and people stop looking at it. Only write
+when a rule goes from calm to fired or vice versa.
 
-**2. Una regla que no se puede evaluar NO es una regla que no dispara.** Si falta el dato,
-el estado es `sin_datos`, no `ok`. Un panel que pinta en verde lo que no pudo medir es
-peor que no tener panel: da confianza donde no hay informacion.
+**2. A rule that can't be evaluated IS NOT a rule that doesn't fire.** If data is missing,
+the state is `sin_datos`, not `ok`. A panel that paints green what couldn't measure is
+worse than no panel: it gives confidence where there's no information.
 """
 
 from __future__ import annotations
@@ -21,24 +21,26 @@ import psycopg
 DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
 
 TIPOS = {
-    "price_above":  ("precio por encima de",        "close"),
-    "price_below":  ("precio por debajo de",        "close"),
-    "z_above":      ("z-score por encima de",       "z_252d"),
-    "z_below":      ("z-score por debajo de",       "z_252d"),
-    "pos_above":    ("posicion en el rango sobre",  "pos_rango_252d"),
-    "pos_below":    ("posicion en el rango bajo",   "pos_rango_252d"),
-    "vol_above":    ("volatilidad anual sobre",     "vol_20d"),
+    "price_above":  ("price above",        "close"),
+    "price_below":  ("price below",        "close"),
+    "z_above":      ("z-score above",       "z_252d"),
+    "z_below":      ("z-score below",       "z_252d"),
+    "pos_above":    ("position in range above",  "pos_rango_252d"),
+    "pos_below":    ("position in range below",   "pos_rango_252d"),
+    "vol_above":    ("annual volatility above",     "vol_20d"),
 }
 
 
 @dataclass
-class Evaluacion:
+class Evaluation:
     rule_id: int
     name: str
     symbol: str | None
     kind: str
     threshold: float
     value: float | None
+    # These three values are data, not prose: they are stored, compared and
+    # rendered by the dashboard. Renaming them would break stored history.
     estado: str            # "disparada" · "ok" · "sin_datos"
     mensaje: str
 
@@ -95,14 +97,14 @@ def evaluar(*, dsn: str = DSN, registrar: bool = True) -> list[Evaluacion]:
                     arriba = kind.endswith("_above")
                     estado = "disparada" if (valor >= thr if arriba else valor <= thr) else "ok"
 
-            etiqueta = TIPOS.get(kind, ("cambio de la canasta sobre", ""))[0]
-            objeto = symbol or f"canasta «{basket}»"
+            etiqueta = TIPOS.get(kind, ("change in basket over", ""))[0]
+            objeto = symbol or f"basket «{basket}»"
             mensaje = (
                 f"{objeto}: {etiqueta} {thr:g}" +
-                (f" — actualmente {valor:.4g}" if valor is not None
-                 else " — sin dato para evaluar")
+                (f" — currently {valor:.4g}" if valor is not None
+                 else " — no data to evaluate")
             )
-            salida.append(Evaluacion(rid, name, symbol or basket, kind, float(thr),
+            salida.append(Evaluation(rid, name, symbol or basket, kind, float(thr),
                                      valor, estado, mensaje))
 
             if registrar and estado != "sin_datos":

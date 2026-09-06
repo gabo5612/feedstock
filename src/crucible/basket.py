@@ -1,13 +1,13 @@
-"""Canasta de costo, exposicion y escenarios.
+"""Cost basket, exposure and scenarios.
 
-Responde la pregunta que de verdad tiene una planta: **cuanto me cuesta producir una
-unidad, como evoluciono ese costo, y que insumo lo movio.** Un grafico de precios de
-commodities no responde eso; una canasta si.
+Answers the question a plant actually has: **what does one unit cost me to produce, how did
+that cost evolve, and which input moved it.** A chart of commodity prices does not answer
+that; a basket does.
 
-Tres cosas salen del mismo calculo:
-  · **costo**      — la serie del costo unitario en el tiempo
-  · **exposicion** — cuanto pesa cada insumo en el costo de hoy
-  · **escenario**  — cuanto cambia el costo si un insumo se mueve X%
+Three things come out of the same computation:
+  · **cost**      — the unit-cost series over time
+  · **exposure**  — how much each input weighs in today's cost
+  · **scenario**  — how much the cost changes if one input moves X%
 """
 
 from __future__ import annotations
@@ -17,7 +17,7 @@ from dataclasses import dataclass, field
 
 import psycopg
 
-from .units import convertir, unidad_de_precio
+from .units import convert, price_unit
 
 DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
 
@@ -29,7 +29,7 @@ class Componente:
     qty: float
     qty_unit: str
     price_unit: str
-    qty_en_unidad_de_precio: float
+    qty_in_price_unit: float
     precio: float | None = None
     costo: float | None = None
 
@@ -48,16 +48,16 @@ class Canasta:
 
 def crear(name: str, items: list[dict], *, description: str = "",
           output_unit: str = "tonelada de producto", dsn: str = DSN) -> Canasta:
-    """`items`: [{symbol, qty, qty_unit, nota?}]. Valida las unidades ANTES de guardar."""
+    """`items`: [{symbol, qty, qty_unit, nota?}]. Validates units BEFORE saving."""
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
-        # La validacion va primero: una canasta guardada a medias con una unidad
-        # imposible es peor que un error.
+        # Validation comes first: a half-saved basket with an impossible unit is worse
+        # than an error.
         for it in items:
             cur.execute("SELECT unit FROM core.instrument WHERE symbol=%s", (it["symbol"],))
-            fila = cur.fetchone()
-            if not fila:
-                raise ValueError(f"{it['symbol']} no existe en el registro de instrumentos")
-            convertir(float(it["qty"]), it["qty_unit"], unidad_de_precio(fila[0]))
+            row = cur.fetchone()
+            if not row:
+                raise ValueError(f"{it['symbol']} is not in the instrument registry")
+            convert(float(it["qty"]), it["qty_unit"], price_unit(row[0]))
 
         cur.execute(
             """INSERT INTO core.basket (name, description, output_unit) VALUES (%s,%s,%s)
@@ -86,26 +86,26 @@ def cargar(name: str, *, dsn: str = DSN) -> Canasta | None:
                 WHERE bi.basket=%s ORDER BY bi.symbol""", (name,))
         comps = []
         for sym, nombre, qty, qunit, punit in cur.fetchall():
-            up = unidad_de_precio(punit)
+            up = price_unit(punit)
             comps.append(Componente(
                 symbol=sym, nombre=nombre, qty=float(qty), qty_unit=qunit,
-                price_unit=up, qty_en_unidad_de_precio=convertir(float(qty), qunit, up)))
+                price_unit=up, qty_in_price_unit=convert(float(qty), qunit, up)))
     return Canasta(name=cab[0], description=cab[1], output_unit=cab[2], componentes=comps)
 
 
 def serie_costo(name: str, *, days: int = 365, dsn: str = DSN) -> dict:
-    """Costo unitario dia por dia.
+    """Unit cost, day by day.
 
-    Solo se computa un dia si TODOS los insumos cotizaron ese dia. Rellenar el faltante
-    con el ultimo precio conocido produciria una serie que parece continua y esconde que
-    un insumo dejo de reportar — el mismo criterio que marcar los huecos en `core.bar`.
+    A day is only computed if ALL inputs traded that day. Filling the missing one with the
+    last known price would produce a series that looks continuous and hides the fact that an
+    input stopped reporting — the same criterion as flagging gaps in `core.bar`.
     """
     c = cargar(name, dsn=dsn)
     if not c or not c.componentes:
         return {"basket": name, "series": [], "components": []}
 
     syms = [x.symbol for x in c.componentes]
-    factores = {x.symbol: x.qty_en_unidad_de_precio for x in c.componentes}
+    factors = {x.symbol: x.qty_in_price_unit for x in c.componentes}
 
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
@@ -113,41 +113,41 @@ def serie_costo(name: str, *, days: int = 365, dsn: str = DSN) -> dict:
                 WHERE symbol = ANY(%s) AND interval='1d' AND close IS NOT NULL
                   AND ts >= now() - (%s || ' days')::interval
                 ORDER BY ts""", (syms, days))
-        por_dia: dict = {}
+        by_day: dict = {}
         for f, sym, close in cur.fetchall():
-            por_dia.setdefault(f, {})[sym] = float(close)
+            by_day.setdefault(f, {})[sym] = float(close)
 
-    serie, aportes = [], {s: [] for s in syms}
-    completos = 0
-    for f in sorted(por_dia):
-        precios = por_dia[f]
-        if len(precios) != len(syms):
-            continue                      # dia incompleto: no se inventa
-        completos += 1
+    series, contributions = [], {s: [] for s in syms}
+    complete = 0
+    for f in sorted(by_day):
+        prices = by_day[f]
+        if len(prices) != len(syms):
+            continue                      # incomplete day: nothing is invented
+        complete += 1
         total = 0.0
         for s in syms:
-            ap = precios[s] * factores[s]
-            aportes[s].append(ap)
-            total += ap
-        serie.append([str(f), round(total, 4)])
+            contribution = prices[s] * factors[s]
+            contributions[s].append(contribution)
+            total += contribution
+        series.append([str(f), round(total, 4)])
 
-    ultimo = {s: (aportes[s][-1] if aportes[s] else None) for s in syms}
-    total_ultimo = sum(v for v in ultimo.values() if v) or 1.0
+    last = {s: (contributions[s][-1] if contributions[s] else None) for s in syms}
+    last_total = sum(v for v in last.values() if v) or 1.0
     return {
         "basket": name,
         "output_unit": c.output_unit,
-        "series": serie,
-        "days_complete": completos,
-        "days_seen": len(por_dia),
+        "series": series,
+        "days_complete": complete,
+        "days_seen": len(by_day),
         "components": [
             {
                 "symbol": x.symbol, "name": x.nombre,
                 "qty": x.qty, "qty_unit": x.qty_unit,
-                "qty_price_unit": round(x.qty_en_unidad_de_precio, 6),
+                "qty_price_unit": round(x.qty_in_price_unit, 6),
                 "price_unit": x.price_unit,
-                "cost": ultimo[x.symbol],
-                # Exposicion: cuanto del costo de hoy depende de este insumo.
-                "share_pct": (ultimo[x.symbol] / total_ultimo * 100) if ultimo[x.symbol] else None,
+                "cost": last[x.symbol],
+                # Exposure: how much of today's cost depends on this input.
+                "share_pct": (last[x.symbol] / last_total * 100) if last[x.symbol] else None,
             }
             for x in c.componentes
         ],
@@ -155,43 +155,42 @@ def serie_costo(name: str, *, days: int = 365, dsn: str = DSN) -> dict:
 
 
 def escenario(name: str, shocks: dict[str, float], *, dsn: str = DSN) -> dict:
-    """Cuanto cambia el costo si cada insumo se mueve el % indicado.
+    """How much the cost changes if each input moves by the given %.
 
-    `shocks`: {symbol: variacion_pct}. Los insumos sin shock quedan quietos.
+    `shocks`: {symbol: pct_change}. Inputs without a shock stay put.
 
-    **Lo que este calculo NO hace:** propagar el shock a los demas insumos usando la
-    correlacion. Si el cobre sube 10%, historicamente el aluminio tiende a acompanar —
-    pero aplicar eso automaticamente convertiria un escenario explicito en una prediccion
-    encubierta. El panel muestra las correlaciones al lado para que la decision la tome
-    una persona.
+    **What this computation does NOT do:** propagate the shock to the other inputs using
+    correlation. If copper rises 10%, aluminium historically tends to follow — but applying
+    that automatically would turn an explicit scenario into a covert prediction. The panel
+    shows the correlations alongside so a person makes that call.
     """
     base = serie_costo(name, days=30, dsn=dsn)
     comps = {c["symbol"]: c for c in base["components"]}
     if not comps or not base["series"]:
         return {"basket": name, "error": "sin datos"}
 
-    costo_base = base["series"][-1][1]
-    detalle, nuevo = [], 0.0
+    base_cost = base["series"][-1][1]
+    detail, new_cost = [], 0.0
     for s, c in comps.items():
         pct = float(shocks.get(s, 0.0))
-        antes = c["cost"] or 0.0
-        despues = antes * (1 + pct / 100)
-        nuevo += despues
-        detalle.append({
-            "symbol": s, "shock_pct": pct, "cost_before": antes,
-            "cost_after": despues, "delta": despues - antes,
+        before = c["cost"] or 0.0
+        after = before * (1 + pct / 100)
+        new_cost += after
+        detail.append({
+            "symbol": s, "shock_pct": pct, "cost_before": before,
+            "cost_after": after, "delta": after - before,
         })
 
     return {
         "basket": name,
-        "cost_before": costo_base,
-        "cost_after": round(nuevo, 4),
-        "delta": round(nuevo - costo_base, 4),
-        "delta_pct": round((nuevo / costo_base - 1) * 100, 3) if costo_base else None,
-        "components": sorted(detalle, key=lambda d: -abs(d["delta"])),
-        "nota": ("Los insumos sin shock quedan quietos. Este calculo NO propaga el "
-                 "movimiento a los demas via correlacion: eso convertiria un escenario "
-                 "explicito en una prediccion encubierta."),
+        "cost_before": base_cost,
+        "cost_after": round(new_cost, 4),
+        "delta": round(new_cost - base_cost, 4),
+        "delta_pct": round((new_cost / base_cost - 1) * 100, 3) if base_cost else None,
+        "components": sorted(detail, key=lambda d: -abs(d["delta"])),
+        "nota": ("Inputs without a shock stay put. This computation does NOT propagate the "
+                 "move to the others via correlation: that would turn an explicit scenario "
+                 "into a covert prediction."),
     }
 
 

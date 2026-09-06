@@ -1,4 +1,4 @@
--- Alertas y su historial.
+-- Alerts and their history.
 CREATE TABLE IF NOT EXISTS core.alert_rule (
     id         bigserial PRIMARY KEY,
     name       text NOT NULL,
@@ -12,9 +12,8 @@ CREATE TABLE IF NOT EXISTS core.alert_rule (
     CHECK (symbol IS NOT NULL OR basket IS NOT NULL)
 );
 
--- Historial: cada vez que una regla CAMBIA de estado. No se escribe una fila por
--- evaluacion, solo por transicion: un log que repite "sigue disparada" todos los dias
--- deja de leerse a la semana.
+-- History: every time a rule CHANGES state. A row is not written per evaluation, only per
+-- transition: a log repeating "still firing" every day stops being read within a week.
 CREATE TABLE IF NOT EXISTS core.alert_event (
     id       bigserial PRIMARY KEY,
     rule_id  bigint NOT NULL REFERENCES core.alert_rule(id) ON DELETE CASCADE,

@@ -1,19 +1,19 @@
-"""Senal de compra para abastecimiento — y su verificacion.
+"""Procurement buy signal — and its verification.
 
-**Lo que esta senal NO hace: predecir el precio.** No dice "el cobre va a bajar". Dice
-donde esta el precio HOY respecto de su propia historia, y —esto es lo que la hace
-util— **que paso historicamente cuando estuvo ahi**, medido sobre los 10 anos que hay
-en la base.
+**What this signal does NOT do: predict the price.** It does not say "copper is going to
+fall". It says where the price sits TODAY relative to its own history and — this is what
+makes it useful — **what happened historically when it sat there**, measured over the 10
+years in the database.
 
-La diferencia no es semantica. Un pronostico se evalua por su error; esta senal se evalua
-preguntando: *"cuando dijo BARATO, comprar ahi salio mejor que comprar en un dia
-cualquiera?"* Esa pregunta se responde con datos pasados y sin ningun modelo, y la
-respuesta puede perfectamente ser **no** — en cuyo caso la senal se reporta igual, con su
-numero, y quien la lea sabra cuanto vale.
+The difference is not semantic. A forecast is evaluated by its error; this signal is
+evaluated by asking: *"when it said CHEAP, did buying there work out better than buying on
+any random day?"* That question is answered with past data and no model at all, and the
+answer can perfectly well be **no** — in which case the signal is reported anyway, with its
+number, and whoever reads it knows what it is worth.
 
-El baseline contra el que se mide es "comprar sin mirar nada". Es el equivalente al
-baseline naive del pronostico, y por la misma razon: sin el, cualquier numero que publique
-la senal no significa nada.
+The baseline it is measured against is "buying without looking at anything". It is the
+equivalent of the forecast's naive baseline, and for the same reason: without it, any number
+the signal publishes means nothing.
 """
 
 from __future__ import annotations
@@ -25,10 +25,10 @@ import psycopg
 
 DSN = os.environ.get("CRUCIBLE_DSN", "postgresql://crucible:crucible@localhost:5434/crucible")
 
-# Cortes sobre `pos_rango_252d`: donde esta el cierre dentro del rango de 52 semanas.
-# Elegidos como quintiles —no ajustados para que el resultado quede lindo—, y esa decision
-# se toma ANTES de mirar el backtest. Moverlos despues de ver los numeros seria ajustar la
-# senal a los datos con los que se la evalua.
+# Cut points over `pos_rango_252d`: where the close sits within the 52-week range.
+# Chosen as quintiles — not tuned to make the result look good — and that decision is taken
+# BEFORE looking at the backtest. Moving them after seeing the numbers would be fitting the
+# signal to the very data it is evaluated against.
 CORTES = (
     ("muy_barato", 0.00, 0.20),
     ("barato",     0.20, 0.40),
@@ -37,12 +37,14 @@ CORTES = (
     ("muy_caro",   0.80, 1.01),
 )
 
+# The band keys are data — they are stored, compared and rendered — so they keep their
+# original names. Only the labels shown to a person are translated.
 ETIQUETAS = {
-    "muy_barato": "Muy barato para su propia historia",
-    "barato":     "Barato para su propia historia",
-    "normal":     "En su rango habitual",
-    "caro":       "Caro para su propia historia",
-    "muy_caro":   "Muy caro para su propia historia",
+    "muy_barato": "Very cheap relative to its own history",
+    "barato":     "Cheap relative to its own history",
+    "normal":     "Within its usual range",
+    "caro":       "Expensive relative to its own history",
+    "muy_caro":   "Very expensive relative to its own history",
 }
 
 
@@ -57,7 +59,7 @@ def clasificar(pos: float | None) -> str | None:
 
 @dataclass
 class Estado:
-    """Donde esta el precio hoy. Es una descripcion, no una prediccion."""
+    """Where the price sits today. A description, not a prediction."""
 
     symbol: str
     ts: str
@@ -70,20 +72,20 @@ class Estado:
 
     @property
     def etiqueta(self) -> str:
-        return ETIQUETAS.get(self.banda or "", "Sin historia suficiente")
+        return ETIQUETAS.get(self.banda or "", "Not enough history")
 
 
 @dataclass
 class Evidencia:
-    """Que paso DESPUES, historicamente, cuando la senal estuvo en esta banda.
+    """What happened AFTERWARDS, historically, when the signal sat in this band.
 
-    `cambio_medio_pct` es el cambio medio del precio en los `horizonte` dias habiles
-    siguientes a un dia en esta banda. `baseline_pct` es el mismo numero calculado sobre
-    TODOS los dias, sin mirar la senal: comprar sin criterio.
+    `cambio_medio_pct` is the mean price change over the `horizonte` business days following
+    a day in this band. `baseline_pct` is the same number computed over ALL days, without
+    looking at the signal: buying with no criterion.
 
-    `ventaja_pct` = baseline − banda. Positivo significa que, historicamente, comprar en
-    esta banda salio mas barato que comprar en un dia cualquiera. **Negativo significa que
-    salio peor, y se publica igual.**
+    `ventaja_pct` = baseline − band. Positive means that, historically, buying in this band
+    came out cheaper than buying on any random day. **Negative means it came out worse, and
+    it is published all the same.**
     """
 
     symbol: str
@@ -177,11 +179,11 @@ def evidencia(symbol: str, banda: str, horizonte: int = 60, *, dsn: str = DSN) -
 
 
 def recomendacion(symbol: str, *, horizonte: int = 60, dsn: str = DSN) -> dict:
-    """El paquete completo: donde esta, que paso historicamente, y cuanto confiar."""
+    """The full package: where it sits, what happened historically, and how much to trust it."""
     e = estado(symbol, dsn=dsn)
     if e is None or e.banda is None:
         return {"symbol": symbol, "estado": None,
-                "aviso": "Sin 252 dias de historia: no hay con que comparar."}
+                "aviso": "Fewer than 252 days of history: nothing to compare against."}
 
     ev = evidencia(symbol, e.banda, horizonte, dsn=dsn)
     salida = {
@@ -202,18 +204,19 @@ def recomendacion(symbol: str, *, horizonte: int = 60, dsn: str = DSN) -> dict:
             "baseline_pct": ev.baseline_pct,
             "ventaja_pct": ev.ventaja_pct,
             "veces_bajo_despues_pct": ev.veces_bajo_despues,
-            # El texto se arma del numero medido; no hay frases fijas de "compra fuerte".
+            # The text is assembled from the measured number; there are no canned
+            # "strong buy" phrases anywhere.
             "lectura": (
-                f"Cuando este instrumento estuvo en la banda «{e.banda}», el precio "
-                f"{ev.horizonte} dias habiles despues cambio en promedio "
-                f"{ev.cambio_medio_pct:+.1f}%, contra {ev.baseline_pct:+.1f}% comprando "
-                f"en un dia cualquiera. Ventaja historica: {ev.ventaja_pct:+.1f} puntos "
-                f"sobre {ev.n} casos."
+                f"When this instrument sat in the «{e.banda}» band, the price "
+                f"{ev.horizonte} business days later changed on average "
+                f"{ev.cambio_medio_pct:+.1f}%, against {ev.baseline_pct:+.1f}% when buying "
+                f"on any random day. Historical edge: {ev.ventaja_pct:+.1f} points over "
+                f"{ev.n} cases."
             ),
         }
     salida["advertencia"] = (
-        "Esto describe donde esta el precio respecto de su historia y que paso despues en "
-        "el pasado. NO es un pronostico. Una ventaja historica chica o negativa significa "
-        "que la senal no sirve para ese instrumento, y se publica igual."
+        "This describes where the price sits relative to its history and what happened "
+        "afterwards in the past. It is NOT a forecast. A small or negative historical edge "
+        "means the signal is useless for that instrument, and it is published all the same."
     )
     return salida

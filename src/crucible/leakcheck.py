@@ -1,13 +1,13 @@
-"""Guard de fuga de datos.
+"""Data-leakage guard.
 
-La idea, y es simple: **recalcular cada feature con la serie truncada en `origin_ts` y
-exigir el mismo valor que con la serie completa.** Si una feature mira hacia adelante, el
-truncado le saca ese futuro y el valor cambia. El test falla.
+The idea is simple: **recompute every feature with the series truncated at `origin_ts` and
+require the same value as with the full series.** If a feature looks ahead, truncation takes
+that future away and the value changes. The test fails.
 
-Es deliberadamente independiente del SQL de `features.py`: reimplementa las ventanas en
-Python. Si el guard compartiera codigo con lo que audita, un error en la definicion de
-ventana se colaria en los dos y el test pasaria feliz. Un verificador que comparte la
-suposicion del sistema verificado no verifica nada.
+It is deliberately independent of the SQL in `features.py`: it reimplements the windows in
+Python. If the guard shared code with what it audits, an error in a window definition would
+slip into both and the test would pass happily. A verifier that shares the verified system's
+assumption verifies nothing.
 """
 
 from __future__ import annotations
@@ -27,16 +27,16 @@ class Leak:
     symbol: str
     origin_ts: str
     feature: str
-    con_futuro: float
-    sin_futuro: float
+    con_futuro: float      # value as persisted (may contain the future)
+    sin_futuro: float      # value recomputed with the series truncated
 
     @property
     def delta(self) -> float:
         return abs(self.con_futuro - self.sin_futuro)
 
 
-def _sma(cierres: list[float], n: int) -> float | None:
-    return sum(cierres[-n:]) / n if len(cierres) >= n else None
+def _sma(closes: list[float], n: int) -> float | None:
+    return sum(closes[-n:]) / n if len(closes) >= n else None
 
 
 def _sd(xs: list[float]) -> float | None:
@@ -46,29 +46,29 @@ def _sd(xs: list[float]) -> float | None:
     return math.sqrt(sum((x - m) ** 2 for x in xs) / (len(xs) - 1))
 
 
-def _recalcular(cierres: list[float]) -> dict[str, float | None]:
-    """Las mismas features, calculadas SOLO con lo que habia hasta el ultimo elemento."""
-    if not cierres:
+def _recompute(closes: list[float]) -> dict[str, float | None]:
+    """The same features, computed ONLY from what existed up to the last element."""
+    if not closes:
         return {}
-    hoy = cierres[-1]
-    rets = [math.log(cierres[i] / cierres[i - 1]) for i in range(1, len(cierres))]
+    today = closes[-1]
+    rets = [math.log(closes[i] / closes[i - 1]) for i in range(1, len(closes))]
     out: dict[str, float | None] = {}
 
     for n in (20, 60, 252):
-        sma = _sma(cierres, n)
+        sma = _sma(closes, n)
         out[f"sma_{n}d"] = sma
-        out[f"dist_sma_{n}d"] = (hoy / sma - 1) if sma else None
+        out[f"dist_sma_{n}d"] = (today / sma - 1) if sma else None
 
     for n in (20, 60):
         v = _sd(rets[-n:]) if len(rets) >= n else None
         out[f"vol_{n}d"] = v * math.sqrt(252) if v is not None else None
 
-    if len(cierres) >= 252:
-        ventana = cierres[-252:]
-        lo, hi = min(ventana), max(ventana)
-        out["pos_rango_252d"] = (hoy - lo) / (hi - lo) if hi > lo else None
-        sd, media = _sd(ventana), sum(ventana) / len(ventana)
-        out["z_252d"] = (hoy - media) / sd if sd else None
+    if len(closes) >= 252:
+        window = closes[-252:]
+        lo, hi = min(window), max(window)
+        out["pos_rango_252d"] = (today - lo) / (hi - lo) if hi > lo else None
+        sd, mean_ = _sd(window), sum(window) / len(window)
+        out["z_252d"] = (today - mean_) / sd if sd else None
     return out
 
 
@@ -79,11 +79,12 @@ def check(
     dsn: str = DSN,
     inyectar_fuga: bool = False,
 ) -> list[Leak]:
-    """Compara lo persistido contra el recalculo truncado en varios `origin_ts`.
+    """Compares what was persisted against the truncated recomputation at several
+    `origin_ts` points.
 
-    `inyectar_fuga=True` calcula a proposito una media movil **centrada** (que usa dias
-    posteriores). Sirve para probar que el guard sirve: un guard que nunca encuentra nada
-    es indistinguible de un guard roto.
+    `inyectar_fuga=True` deliberately computes a **centred** moving average (one that uses
+    later days). It exists to prove the guard works: a guard that never finds anything is
+    indistinguishable from a broken guard.
     """
     with psycopg.connect(dsn) as conn, conn.cursor() as cur:
         cur.execute(
@@ -91,39 +92,39 @@ def check(
                 WHERE symbol=%s AND interval='1d' AND close > 0 ORDER BY ts""",
             (symbol,),
         )
-        serie = cur.fetchall()
+        series = cur.fetchall()
         cur.execute(
             """SELECT ts, name, value FROM feat.feature
                 WHERE symbol=%s AND feature_version='v1'""",
             (symbol,),
         )
-        persistido: dict = {}
+        persisted: dict = {}
         for ts, name, value in cur.fetchall():
-            persistido.setdefault(ts, {})[name] = float(value)
+            persisted.setdefault(ts, {})[name] = float(value)
 
-    if len(serie) < 300:
+    if len(series) < 300:
         return []
 
-    hallazgos: list[Leak] = []
-    paso = max(1, (len(serie) - 260) // muestras)
-    for i in range(260, len(serie), paso):
-        ts = serie[i][0]
-        cierres = [float(c) for _, c in serie[: i + 1]]
+    findings: list[Leak] = []
+    step = max(1, (len(series) - 260) // muestras)
+    for i in range(260, len(series), step):
+        ts = series[i][0]
+        closes = [float(c) for _, c in series[: i + 1]]
 
         if inyectar_fuga:
-            # LA FUGA: media centrada, usa 10 dias POSTERIORES a `ts`.
-            futuro = [float(c) for _, c in serie[i + 1 : i + 11]]
-            ventana = cierres[-10:] + futuro
-            esperado = {"sma_20d": sum(ventana) / len(ventana)}
+            # THE LEAK: a centred mean, using 10 days AFTER `ts`.
+            future = [float(c) for _, c in series[i + 1 : i + 11]]
+            window = closes[-10:] + future
+            expected = {"sma_20d": sum(window) / len(window)}
         else:
-            esperado = _recalcular(cierres)
+            expected = _recompute(closes)
 
-        real = persistido.get(ts, {})
-        for nombre, valor in esperado.items():
-            if valor is None or nombre not in real:
+        actual = persisted.get(ts, {})
+        for name, value in expected.items():
+            if value is None or name not in actual:
                 continue
-            if abs(real[nombre] - valor) > max(TOL, abs(valor) * 1e-6):
-                hallazgos.append(
-                    Leak(symbol, str(ts.date()), nombre, real[nombre], valor)
+            if abs(actual[name] - value) > max(TOL, abs(value) * 1e-6):
+                findings.append(
+                    Leak(symbol, str(ts.date()), name, actual[name], value)
                 )
-    return hallazgos
+    return findings

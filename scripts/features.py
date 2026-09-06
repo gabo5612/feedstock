@@ -1,4 +1,4 @@
-"""Calcula y persiste las features de todos los instrumentos."""
+"""Computes and persists features for every instrument."""
 from __future__ import annotations
 import sys
 from pathlib import Path
@@ -7,7 +7,7 @@ from crucible.features import compute_all  # noqa: E402
 from crucible.instruments import INSTRUMENTS  # noqa: E402
 
 syms = sys.argv[1:] or [i.symbol for i in INSTRUMENTS]
-print(f"\n{'instrumento':<20}{'filas de feature':>18}")
+print(f"\n{'instrument':<20}{'feature rows':>18}")
 print("─" * 40)
 total = 0
 for r in compute_all(syms):
@@ -17,4 +17,4 @@ print("─" * 40)
 print(f"{'TOTAL':<20}{total:>18,}\n")
 if syms:
     from crucible.features import compute
-    print("features por instrumento:", ", ".join(compute(syms[0], persist=False).names), "\n")
+    print("features per instrument:", ", ".join(compute(syms[0], persist=False).names), "\n")

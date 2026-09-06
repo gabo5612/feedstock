@@ -1,6 +1,6 @@
-"""El guard de fuga como test de CI. Es el artefacto que mas vale del proyecto.
+"""The leakage guard as a CI test. It is the project's most valuable artefact.
 
-Necesita la base levantada con features calculadas. Se saltea si no hay.
+It needs the database up with features computed. Skipped if there are none.
 """
 
 import pytest
@@ -9,11 +9,11 @@ from crucible.leakcheck import check
 from crucible.signals import CORTES, clasificar
 
 pytestmark = pytest.mark.skipif(
-    __import__("os").environ.get("CRUCIBLE_SKIP_DB") == "1", reason="sin base"
+    __import__("os").environ.get("CRUCIBLE_SKIP_DB") == "1", reason="no database"
 )
 
 
-def _hay_datos(symbol="copper") -> bool:
+def _has_data(symbol="copper") -> bool:
     try:
         import psycopg
         from crucible.leakcheck import DSN
@@ -25,50 +25,51 @@ def _hay_datos(symbol="copper") -> bool:
 
 
 @pytest.mark.parametrize("symbol", ["copper", "gold", "natgas", "eurusd"])
-def test_ninguna_feature_mira_el_futuro(symbol):
-    """Recalcula cada feature truncando la serie en cada origin_ts y exige el mismo valor.
+def test_no_feature_looks_into_the_future(symbol):
+    """Recomputes each feature truncating the series at each origin_ts, requiring the same
+    value.
 
-    Si una feature usara un dato posterior, el truncado se lo saca y el valor cambia.
+    If a feature used later data, truncation takes it away and the value changes.
     """
-    if not _hay_datos(symbol):
-        pytest.skip("sin features calculadas")
-    fugas = check(symbol, muestras=25)
-    assert not fugas, "\n".join(
+    if not _has_data(symbol):
+        pytest.skip("no features computed")
+    leaks = check(symbol, muestras=25)
+    assert not leaks, "\n".join(
         f"{f.symbol} {f.origin_ts} {f.feature}: {f.con_futuro} vs {f.sin_futuro}"
-        for f in fugas[:6]
+        for f in leaks[:6]
     )
 
 
-def test_el_guard_detecta_una_fuga_inyectada():
-    """Un guard que nunca encuentra nada es indistinguible de un guard roto.
+def test_the_guard_detects_an_injected_leak():
+    """A guard that never finds anything is indistinguishable from a broken guard.
 
-    Se calcula a proposito una media CENTRADA (usa 10 dias posteriores) y se exige que
-    el guard la denuncie. Si este test empieza a pasar sin hallazgos, el guard se rompio
-    y hay que arreglarlo antes que nada.
+    A CENTRED mean is computed on purpose (it uses 10 later days) and the guard is required
+    to report it. If this test ever starts passing with no findings, the guard broke and
+    that has to be fixed before anything else.
     """
-    if not _hay_datos():
-        pytest.skip("sin features calculadas")
-    fugas = check("copper", muestras=25, inyectar_fuga=True)
-    assert fugas, "el guard NO detecto una media centrada: esta roto"
-    assert all(f.delta > 0 for f in fugas)
+    if not _has_data():
+        pytest.skip("no features computed")
+    leaks = check("copper", muestras=25, inyectar_fuga=True)
+    assert leaks, "the guard did NOT detect a centred mean: it is broken"
+    assert all(f.delta > 0 for f in leaks)
 
 
-# ── la senal ────────────────────────────────────────────────────────────────
+# ── the signal ──────────────────────────────────────────────────────────────
 @pytest.mark.parametrize("pos,esperado", [
     (0.0, "muy_barato"), (0.19, "muy_barato"), (0.20, "barato"),
     (0.45, "normal"), (0.75, "caro"), (0.95, "muy_caro"), (1.0, "muy_caro"),
 ])
-def test_las_bandas_cubren_todo_el_rango(pos, esperado):
+def test_the_bands_cover_the_whole_range(pos, esperado):
     assert clasificar(pos) == esperado
 
 
-def test_los_cortes_son_quintiles_sin_huecos():
-    # Elegidos antes de ver el backtest. Moverlos despues seria ajustar la senal a los
-    # datos con los que se la evalua.
+def test_the_cut_points_are_quintiles_without_gaps():
+    # Chosen before seeing the backtest. Moving them afterwards would be fitting the
+    # signal to the very data it is evaluated against.
     assert [c[1] for c in CORTES] == [0.0, 0.2, 0.4, 0.6, 0.8]
     for a, b in zip(CORTES, CORTES[1:]):
-        assert a[2] == b[1], "hay un hueco entre bandas"
+        assert a[2] == b[1], "there is a gap between bands"
 
 
-def test_sin_posicion_no_hay_banda():
+def test_without_a_position_there_is_no_band():
     assert clasificar(None) is None

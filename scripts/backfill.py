@@ -1,7 +1,7 @@
-"""Backfill de 10 anos. Imprime el reporte de filas y huecos por instrumento.
+"""10-year backfill. Prints a report of rows and gaps per instrument.
 
-    python3 scripts/backfill.py            # los 12 instrumentos
-    python3 scripts/backfill.py copper     # uno solo
+    python3 scripts/backfill.py            # all 12 instruments
+    python3 scripts/backfill.py copper     # just one
 """
 
 from __future__ import annotations
@@ -20,25 +20,25 @@ def main(argv: list[str]) -> int:
     symbols = argv or [i.symbol for i in INSTRUMENTS]
     reportes = backfill(YahooAdapter(), symbols, years=10)
 
-    print(f"\n{'instrumento':<18}{'nombre verificado':<26}{'filas':>7}{'nuevas':>8}"
-          f"{'huecos':>8}  rango")
+    print(f"\n{'instrument':<18}{'verified name':<26}{'rows':>7}{'new':>8}"
+          f"{'gaps':>8}  range")
     print("─" * 104)
-    fallos = 0
+    failures = 0
     for r in reportes:
         if r.error:
-            fallos += 1
+            failures += 1
             print(f"{r.symbol:<18}✗ {r.error[:78]}")
             continue
         total = r.rows_inserted + r.rows_skipped
-        rango = (f"{r.first_ts:%Y-%m-%d} → {r.last_ts:%Y-%m-%d}"
-                 if r.first_ts and r.last_ts else "—")
+        rng = (f"{r.first_ts:%Y-%m-%d} → {r.last_ts:%Y-%m-%d}"
+               if r.first_ts and r.last_ts else "—")
         print(f"{r.symbol:<18}{r.source_name[:24]:<26}{total:>7}{r.rows_inserted:>8}"
-              f"{r.gaps:>8}  {rango}")
+              f"{r.gaps:>8}  {rng}")
     print("─" * 104)
     ok = [r for r in reportes if not r.error]
-    print(f"{len(ok)} instrumento(s) ingeridos · {fallos} con error · "
-          f"{sum(r.rows_inserted for r in ok)} filas nuevas\n")
-    return 1 if fallos else 0
+    print(f"{len(ok)} instrument(s) ingested · {failures} with errors · "
+          f"{sum(r.rows_inserted for r in ok)} new rows\n")
+    return 1 if failures else 0
 
 
 if __name__ == "__main__":
