@@ -138,6 +138,14 @@ details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); f
       <div id="precio" style="margin-top:16px"></div>
     </div>
 
+    <div class="card" id="card-signal">
+      <h2>¿Es buen momento para comprar?</h2>
+      <p class="note">Dónde está el precio respecto de <strong>su propia historia</strong>,
+        y —lo que importa— <strong>qué pasó después las veces anteriores que estuvo ahí</strong>,
+        medido sobre 10 años. No es un pronóstico.</p>
+      <div id="signal"></div>
+    </div>
+
     <div class="card" id="card-corr">
       <h2>Qué se mueve junto</h2>
       <p class="note">Correlación de <strong>retornos diarios</strong>, no de precios: dos
@@ -255,6 +263,7 @@ async function cargar() {
   ]);
   lineas(ser.series);
   detalle(SEL[0], ser.series[SEL[0]] || [], stats);
+  senal(SEL[0]);
   if (SEL.length > 1) {
     correlacion(await (await fetch(`/api/correlation?${q}`)).json());
     document.getElementById('card-corr').style.display = '';
@@ -400,6 +409,56 @@ function detalle(sym, datos, st) {
     g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
   document.getElementById('precio').innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio de ${sym}">${g}</svg>`;
+}
+
+/* Senal de compra. Lo central del panel NO es la banda sino la VENTAJA MEDIDA: una banda
+   que dice "muy barato" con ventaja negativa significa que, para ese instrumento, comprar
+   barato salio historicamente PEOR que comprar en un dia cualquiera. Mostrar la banda sin
+   la ventaja convertiria una medicion honesta en un consejo falso. */
+async function senal(sym) {
+  const cont = document.getElementById('signal');
+  const d = await (await fetch(`/api/signal?symbol=${sym}&horizon=60`)).json();
+  if (!d.banda) { cont.innerHTML = `<div class="empty">${d.aviso || 'Sin datos'}</div>`; return; }
+
+  const pos = d.pos_rango_252d, v = d.ventaja_pct;
+  const barato = pos < .4;
+  // El color lo decide la EVIDENCIA, no la banda. Sin ventaja medible es gris.
+  const util = v != null && Math.abs(v) >= 1.0;
+  const col = !util ? 'var(--text-3)' : v > 0 ? css('--good') : css('--critical');
+
+  const W = 620, H = 46, m = 10;
+  let g = `<rect x="${m}" y="14" width="${W - m * 2}" height="9" rx="4.5" fill="var(--surface-2)"/>`;
+  [[0,.2],[.2,.4],[.4,.6],[.6,.8],[.8,1]].forEach(([a,b],i) => {
+    const x = m + a * (W - m*2), w = (b - a) * (W - m*2);
+    g += `<rect x="${x+1}" y="14" width="${w-2}" height="9" rx="4.5"
+            fill="${css('--s1')}" opacity="${(.10 + (1-i)*.06).toFixed(2)}"/>`;
+  });
+  const px = m + pos * (W - m * 2);
+  g += `<circle cx="${px}" cy="18.5" r="7" fill="${css('--s1')}" stroke="var(--surface-1)" stroke-width="2"/>
+        <text x="${m}" y="40" class="axis">mínimo del año</text>
+        <text x="${W-m}" y="40" class="axis" text-anchor="end">máximo del año</text>`;
+
+  cont.innerHTML = `
+    <div class="tiles" style="margin-bottom:14px">
+      <div class="tile"><div class="k">estado hoy</div>
+        <div class="v" style="font-size:15px">${d.etiqueta}</div></div>
+      <div class="tile"><div class="k">posición en el rango</div>
+        <div class="v">${(pos*100).toFixed(0)}%</div></div>
+      <div class="tile"><div class="k">ventaja histórica</div>
+        <div class="v" style="color:${col}">${v == null ? '—' : (v>0?'+':'')+v.toFixed(1)+' pts'}</div></div>
+      <div class="tile"><div class="k">casos medidos</div>
+        <div class="v">${d.n_historico ?? '—'}</div></div>
+    </div>
+    <svg viewBox="0 0 ${W} ${H}" style="width:${W}px;max-width:100%"
+      role="img" aria-label="Posición del precio en su rango de 52 semanas">${g}</svg>
+    <p style="margin:12px 0 0;font-size:12.5px;color:var(--text-2);line-height:1.55">${d.lectura || ''}</p>
+    <p style="margin:10px 0 0;font-size:12px;line-height:1.5;color:${col}">
+      <strong>${!util
+        ? 'Sin ventaja medible: para este instrumento la señal no aporta nada. Comprá por calendario.'
+        : v > 0
+          ? 'Históricamente, comprar en esta banda salió mejor que comprar sin mirar.'
+          : 'Ojo: históricamente, comprar en esta banda salió PEOR que comprar sin mirar. La intuición está invertida acá.'}</strong></p>
+    <p class="note" style="margin-top:10px">${d.advertencia}</p>`;
 }
 
 /* Matriz de correlacion — escala DIVERGENTE (azul ↔ rojo, gris en el medio).

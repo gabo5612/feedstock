@@ -183,6 +183,22 @@ def correlation(symbols: str, days: int = Query(365, ge=30, le=4000)) -> dict:
     }
 
 
+@app.get("/api/signal")
+def signal(symbol: str, horizon: int = Query(60, ge=5, le=252)) -> dict:
+    """Donde esta el precio respecto de su historia, y que paso despues historicamente."""
+    from ..signals import recomendacion
+
+    return recomendacion(symbol, horizonte=horizon)
+
+
+@app.get("/api/signals")
+def signals(horizon: int = Query(60, ge=5, le=252)) -> list[dict]:
+    from ..instruments import INSTRUMENTS
+    from ..signals import recomendacion
+
+    return [recomendacion(i.symbol, horizonte=horizon) for i in INSTRUMENTS]
+
+
 @app.get("/")
 def index() -> FileResponse:
     return FileResponse(WEB / "index.html")
