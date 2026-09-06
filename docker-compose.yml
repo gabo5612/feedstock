@@ -1,0 +1,24 @@
+services:
+  db:
+    # timescaledb-ha trae TimescaleDB y pgvector en la misma imagen: una sola dependencia
+    # en vez de compilar extensiones a mano. Es lo que hace que esto levante en una
+    # maquina de planta sin internet, una vez cacheada la imagen.
+    image: timescale/timescaledb-ha:pg16
+    container_name: crucible-db
+    environment:
+      POSTGRES_USER: crucible
+      POSTGRES_PASSWORD: crucible
+      POSTGRES_DB: crucible
+    # 5434: anvil ya usa 5433 y un Supabase local usa 54322. Los tres conviven.
+    ports: ["5434:5432"]
+    volumes:
+      - crucible-pgdata:/home/postgres/pgdata
+      - ./src/crucible/db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U crucible -d crucible"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  crucible-pgdata:
