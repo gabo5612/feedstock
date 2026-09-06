@@ -20,6 +20,28 @@ medido y reproducible"*.
 | M5 | Anomalías + régimen + dashboard | ⬜ |
 | M6 | Ollama con citas + compose offline | ⬜ |
 
+## Dashboard
+
+```bash
+.venv/bin/python -m uvicorn crucible.api.main:app --port 8090
+# abrir http://127.0.0.1:8090
+```
+
+Buscar por nombre, filtrar por clase de activo, elegir hasta 8 instrumentos y comparar.
+**Se sirve del mismo proceso que lee la base:** no hay servicio externo ni telemetría, y
+funciona en una planta sin internet. Sin dependencias de front — los gráficos son SVG
+escrito a mano.
+
+Tres decisiones de lectura, no de estética:
+
+- **Comparación indexada a base 100, nunca dos ejes.** El cobre vale ~6,7 USD/lb y el oro
+  ~4 477 USD/oz. Superponerlos con escalas distintas hace que dos líneas se crucen por
+  cómo se dibujó el gráfico y no por lo que hicieron los precios.
+- **La correlación es de retornos diarios, no de precios.** Dos series con tendencia dan
+  correlación alta aunque no tengan relación — la trampa clásica de este cálculo.
+- **Ocho series es el tope**, porque es lo que valida la paleta. Un noveno color no se
+  inventa: se recorta la selección.
+
 ## Levantar
 
 ```bash

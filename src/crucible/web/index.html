@@ -1,0 +1,443 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crucible — riesgo de costo de insumos</title>
+<style>
+/* Paleta validada con el validador del metodo (8 slots categoricos, luz y oscuro).
+   El WARN de contraste en modo claro (aqua, amarillo, magenta bajo 3:1) se cubre con
+   etiquetas directas y la vista de tabla, que es el alivio que el metodo exige. */
+:root {
+  color-scheme: light;
+  --surface-0: #f4f3f0;
+  --surface-1: #fcfcfb;
+  --surface-2: #eceae5;
+  --border:    #dcd9d2;
+  --text-1:    #0b0b0b;
+  --text-2:    #52514e;
+  --text-3:    #86847d;
+  --grid:      #e6e3dd;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --good: #0ca30c; --critical: #d03b3b;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #232322;
+    --border: #35342f; --text-1: #ffffff; --text-2: #c3c2b7; --text-3: #8b8a80;
+    --grid: #2b2b28;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --good: #0ca30c; --critical: #d03b3b;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #121211; --surface-1: #1a1a19; --surface-2: #232322;
+  --border: #35342f; --text-1: #ffffff; --text-2: #c3c2b7; --text-3: #8b8a80;
+  --grid: #2b2b28;
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+  --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --good: #0ca30c; --critical: #d03b3b;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--surface-0); color: var(--text-1);
+  font: 14px/1.5 ui-sans-serif, -apple-system, "Segoe UI", system-ui, sans-serif;
+}
+.wrap { display: grid; grid-template-columns: 290px 1fr; min-height: 100vh; }
+@media (max-width: 860px) { .wrap { grid-template-columns: 1fr; } aside { border-right: 0 !important; } }
+
+/* ── lateral ─────────────────────────────────────────────────────────── */
+aside { background: var(--surface-1); border-right: 1px solid var(--border); padding: 18px 16px; }
+h1 { font-size: 15px; margin: 0 0 2px; letter-spacing: -.01em; }
+.sub { color: var(--text-3); font-size: 12px; margin-bottom: 16px; }
+.field { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: var(--surface-2); color: var(--text-1); font: inherit; font-size: 13px; }
+.chips { display: flex; flex-wrap: wrap; gap: 5px; margin: 10px 0 12px; }
+.chip { padding: 4px 9px; font-size: 11.5px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--text-2); }
+.chip[aria-pressed="true"] { background: var(--text-1); color: var(--surface-1); border-color: var(--text-1); }
+.rowlist { display: flex; flex-direction: column; gap: 2px; max-height: 62vh; overflow-y: auto; margin: 0 -6px; }
+.row { display: grid; grid-template-columns: 12px 1fr auto; gap: 9px; align-items: center;
+  padding: 7px 6px; border-radius: 7px; cursor: pointer; border: 0; background: none;
+  color: inherit; font: inherit; text-align: left; width: 100%; }
+.row:hover { background: var(--surface-2); }
+.row[aria-pressed="true"] { background: var(--surface-2); }
+.dot { width: 10px; height: 10px; border-radius: 3px; background: var(--border); }
+.nm { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nm small { display: block; color: var(--text-3); font-size: 10.5px; }
+.px { text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; }
+.px small { display: block; font-size: 10.5px; }
+.up { color: var(--good); } .down { color: var(--critical); }
+.hint { color: var(--text-3); font-size: 11px; margin-top: 10px; }
+
+/* ── principal ───────────────────────────────────────────────────────── */
+main { padding: 18px 22px 40px; min-width: 0; }
+.bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.spacer { flex: 1; }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+  padding: 16px 18px; margin-bottom: 16px; }
+.card h2 { font-size: 13px; margin: 0 0 3px; font-weight: 600; }
+.card p.note { color: var(--text-3); font-size: 11.5px; margin: 0 0 14px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; }
+.tile { background: var(--surface-2); border-radius: 9px; padding: 11px 13px; }
+.tile .k { color: var(--text-3); font-size: 10.5px; text-transform: uppercase; letter-spacing: .04em; }
+.tile .v { font-size: 19px; font-variant-numeric: tabular-nums; margin-top: 3px; letter-spacing: -.02em; }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 12px; }
+.legend span { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); }
+.legend i { width: 11px; height: 11px; border-radius: 3px; }
+svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gridline { stroke: var(--grid); stroke-width: 1; }
+.axis { fill: var(--text-3); font-size: 10.5px; }
+table { border-collapse: collapse; width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+th, td { text-align: right; padding: 5px 9px; border-bottom: 1px solid var(--border); }
+th:first-child, td:first-child { text-align: left; }
+th { color: var(--text-3); font-weight: 500; font-size: 11px; }
+details { margin-top: 12px; } summary { cursor: pointer; color: var(--text-2); font-size: 12px; }
+.empty { color: var(--text-3); padding: 34px 0; text-align: center; font-size: 13px; }
+#tip { position: fixed; pointer-events: none; opacity: 0; transition: opacity .1s;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 11px; font-size: 12px; box-shadow: 0 6px 20px rgba(0,0,0,.14); z-index: 9;
+  font-variant-numeric: tabular-nums; }
+</style>
+
+<div class="wrap">
+  <aside>
+    <h1>crucible</h1>
+    <div class="sub">riesgo de costo de insumos · local</div>
+
+    <input id="q" class="field" type="search" placeholder="Buscar instrumento…" autocomplete="off">
+    <div class="chips" id="clases"></div>
+    <div class="rowlist" id="lista"></div>
+    <div class="hint" id="hint"></div>
+  </aside>
+
+  <main>
+    <div class="bar">
+      <div class="chips" id="rangos" style="margin:0"></div>
+      <div class="spacer"></div>
+      <button class="chip" id="tema" aria-pressed="false">◐ tema</button>
+    </div>
+
+    <div class="card">
+      <h2 id="t-cmp">Comparación indexada</h2>
+      <p class="note" id="n-cmp"></p>
+      <div id="cmp"></div>
+      <div class="legend" id="leg-cmp"></div>
+      <details>
+        <summary>Ver los datos como tabla</summary>
+        <div id="tabla-cmp" style="margin-top:10px"></div>
+      </details>
+    </div>
+
+    <div class="card" id="card-stats">
+      <h2 id="t-stats">Detalle</h2>
+      <p class="note" id="n-stats"></p>
+      <div class="tiles" id="tiles"></div>
+      <div id="precio" style="margin-top:16px"></div>
+    </div>
+
+    <div class="card" id="card-corr">
+      <h2>Qué se mueve junto</h2>
+      <p class="note">Correlación de <strong>retornos diarios</strong>, no de precios: dos
+        series con tendencia dan correlación alta aunque no tengan relación. Si el cobre y
+        la energía se mueven juntos, cubrir uno no cubre el otro.</p>
+      <div id="corr"></div>
+    </div>
+  </main>
+</div>
+<div id="tip" role="status"></div>
+
+<script>
+const S = ['--s1','--s2','--s3','--s4','--s5','--s6','--s7','--s8'];
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const fmt = (n, d = 2) => n == null ? '—' :
+  n.toLocaleString('es', { minimumFractionDigits: d, maximumFractionDigits: d });
+/* Decimales segun magnitud: un precio de 6.68 necesita tres y uno de 4477 ninguno.
+   Fijarlos en 3 para todo hace que 91.48 se imprima "91,480" y se lea como 91 mil. */
+const dec = v => v == null ? 2 : Math.abs(v) >= 1000 ? 0 : Math.abs(v) >= 100 ? 1 : 2;
+const precio = v => fmt(v, dec(v));
+const el = (h) => { const t = document.createElement('template'); t.innerHTML = h.trim(); return t.content.firstChild; };
+
+let INSTR = [], SEL = [], DIAS = 365, CLASE = null, Q = '';
+const RANGOS = [[90,'3M'],[365,'1A'],[1095,'3A'],[1825,'5A'],[3650,'10A']];
+
+/* ── carga ─────────────────────────────────────────────────────────── */
+async function init() {
+  try { INSTR = await (await fetch('/api/instruments')).json(); }
+  catch { document.getElementById('lista').innerHTML =
+    '<div class="empty">No se pudo leer la base.<br>¿Levantaste <code>docker-compose up -d</code>?</div>'; return; }
+
+  const clases = [...new Set(INSTR.map(i => i.asset_class))];
+  const cc = document.getElementById('clases');
+  cc.append(...clases.map(c => {
+    const b = el(`<button class="chip" aria-pressed="false">${c}</button>`);
+    b.onclick = () => { CLASE = CLASE === c ? null : c; pintarChips(); pintarLista(); };
+    b.dataset.clase = c; return b;
+  }));
+
+  const rr = document.getElementById('rangos');
+  rr.append(...RANGOS.map(([d, t]) => {
+    const b = el(`<button class="chip" aria-pressed="${d === DIAS}">${t}</button>`);
+    b.onclick = () => { DIAS = d; pintarChips(); cargar(); };
+    b.dataset.dias = d; return b;
+  }));
+
+  document.getElementById('q').oninput = e => { Q = e.target.value.toLowerCase(); pintarLista(); };
+  document.getElementById('tema').onclick = () => {
+    const oscuro = document.documentElement.dataset.theme === 'dark';
+    document.documentElement.dataset.theme = oscuro ? 'light' : 'dark';
+    cargar();
+  };
+
+  SEL = INSTR.filter(i => i.asset_class === 'metal').slice(0, 4).map(i => i.symbol);
+  pintarChips(); pintarLista(); cargar();
+}
+
+function pintarChips() {
+  document.querySelectorAll('#clases .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.clase === CLASE));
+  document.querySelectorAll('#rangos .chip').forEach(b =>
+    b.setAttribute('aria-pressed', +b.dataset.dias === DIAS));
+}
+
+function pintarLista() {
+  const cont = document.getElementById('lista');
+  const vis = INSTR.filter(i =>
+    (!CLASE || i.asset_class === CLASE) &&
+    (!Q || i.symbol.includes(Q) || (i.name || '').toLowerCase().includes(Q)));
+  cont.innerHTML = '';
+  if (!vis.length) { cont.append(el('<div class="empty">Nada coincide.</div>')); return; }
+
+  vis.forEach(i => {
+    const idx = SEL.indexOf(i.symbol);
+    const c = idx >= 0 ? css(S[idx % 8]) : 'var(--border)';
+    const ch = i.change_30d_pct;
+    const cls = ch == null ? '' : ch >= 0 ? 'up' : 'down';
+    const sig = ch == null ? '' : ch >= 0 ? '+' : '';
+    const b = el(`<button class="row" aria-pressed="${idx >= 0}">
+      <span class="dot" style="background:${c}"></span>
+      <span class="nm">${i.symbol}<small>${(i.name || '').slice(0, 26)}</small></span>
+      <span class="px">${precio(i.last)}
+        <small class="${cls}">${sig}${ch == null ? '—' : fmt(ch, 1) + '%'}</small></span>
+    </button>`);
+    b.onclick = () => alternar(i.symbol);
+    cont.append(b);
+  });
+  document.getElementById('hint').textContent =
+    `${SEL.length} de 8 seleccionados · variación a 30 días`;
+}
+
+function alternar(sym) {
+  const i = SEL.indexOf(sym);
+  if (i >= 0) SEL.splice(i, 1);
+  else if (SEL.length < 8) SEL.push(sym);   // 8 = tope de la paleta validada
+  else { document.getElementById('hint').textContent =
+    'Máximo 8: un noveno color no se inventa. Deseleccioná uno.'; return; }
+  pintarLista(); cargar();
+}
+
+/* ── datos y pintado ───────────────────────────────────────────────── */
+async function cargar() {
+  if (!SEL.length) {
+    document.getElementById('cmp').innerHTML = '<div class="empty">Elegí al menos un instrumento.</div>';
+    document.getElementById('leg-cmp').innerHTML = '';
+    document.getElementById('tiles').innerHTML = '';
+    document.getElementById('precio').innerHTML = '';
+    document.getElementById('corr').innerHTML = '';
+    return;
+  }
+  const q = `symbols=${SEL.join(',')}&days=${DIAS}`;
+  const [ser, stats] = await Promise.all([
+    (await fetch(`/api/series?${q}`)).json(),
+    (await fetch(`/api/stats?symbol=${SEL[0]}&days=${DIAS}`)).json(),
+  ]);
+  lineas(ser.series);
+  detalle(SEL[0], ser.series[SEL[0]] || [], stats);
+  if (SEL.length > 1) {
+    correlacion(await (await fetch(`/api/correlation?${q}`)).json());
+    document.getElementById('card-corr').style.display = '';
+  } else document.getElementById('card-corr').style.display = 'none';
+}
+
+/* Comparacion INDEXADA a base 100.
+   Nunca dos ejes: el cobre vale ~6.7 USD/lb y el oro ~4400 USD/oz. Superponerlos con
+   escalas distintas hace que dos lineas se crucen por como se dibujo el grafico y no por
+   lo que hicieron los precios. Indexar es la unica lectura honesta de "quien subio mas". */
+function lineas(series) {
+  const cont = document.getElementById('cmp'), leg = document.getElementById('leg-cmp');
+  const syms = SEL.filter(s => (series[s] || []).length > 1);
+  document.getElementById('n-cmp').textContent =
+    `Cada serie arranca en 100 en su primera fecha del período: la línea muestra el cambio porcentual, no el precio. ${syms.length>1?'Es la única forma honesta de comparar instrumentos con escalas distintas.':''}`;
+  if (!syms.length) { cont.innerHTML = '<div class="empty">Sin datos en este rango.</div>'; return; }
+
+  const W = 980, H = 340, P = { t: 14, r: 62, b: 26, l: 46 };
+  const norm = {}; let lo = Infinity, hi = -Infinity, fechas = [];
+  syms.forEach(s => {
+    const d = series[s], base = d[0][1];
+    norm[s] = d.map(([f, v]) => [f, v / base * 100]);
+    norm[s].forEach(([, v]) => { lo = Math.min(lo, v); hi = Math.max(hi, v); });
+    if (d.length > fechas.length) fechas = d.map(([f]) => f);
+  });
+  const pad = (hi - lo) * .08 || 1; lo -= pad; hi += pad;
+  const n = fechas.length;
+  const X = i => P.l + i / Math.max(1, n - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+
+  let g = '';
+  for (let k = 0; k <= 4; k++) {
+    const v = lo + (hi - lo) * k / 4, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${v.toFixed(0)}</text>`;
+  }
+  const marcas = Math.min(6, n);
+  for (let k = 0; k < marcas; k++) {
+    const i = Math.round(k / (marcas - 1) * (n - 1));
+    g += `<text class="axis" x="${X(i)}" y="${H - 6}" text-anchor="middle">${fechas[i]?.slice(0, 7)}</text>`;
+  }
+  // Linea de base 100: la referencia de "sin cambio".
+  g += `<line class="gridline" x1="${P.l}" y1="${Y(100)}" x2="${W - P.r}" y2="${Y(100)}" stroke-dasharray="3 3"/>`;
+
+  syms.forEach((s, k) => {
+    const c = css(S[k % 8]), d = norm[s];
+    const path = d.map(([f, v], i) => `${i ? 'L' : 'M'}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+    g += `<path d="${path}" fill="none" stroke="${c}" stroke-width="2"
+            stroke-linejoin="round" stroke-linecap="round"/>`;
+  });
+
+  // Etiquetas directas: identidad sin depender del color, y el alivio que pide el WARN de
+  // contraste del validador en modo claro. Se separan verticalmente si dos series
+  // terminan pegadas — dos nombres superpuestos no identifican nada.
+  const etiquetas = syms.map((s, k) => ({
+    s, c: css(S[k % 8]), y: Y(norm[s][norm[s].length - 1][1]), x: X(norm[s].length - 1) + 7,
+  })).sort((a, b) => a.y - b.y);
+  const MIN = 13;
+  for (let i = 1; i < etiquetas.length; i++)
+    if (etiquetas[i].y - etiquetas[i - 1].y < MIN) etiquetas[i].y = etiquetas[i - 1].y + MIN;
+  etiquetas.forEach(e => {
+    g += `<text x="${e.x}" y="${e.y + 3.5}" font-size="11" fill="${e.c}"
+            font-weight="600">${e.s.slice(0, 9)}</text>`;
+  });
+
+  cont.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img"
+    aria-label="Comparación indexada a base 100 de ${syms.join(', ')}">${g}
+    <rect id="cap" x="${P.l}" y="${P.t}" width="${W - P.l - P.r}" height="${H - P.t - P.b}" fill="transparent"/>
+    <line id="cross" y1="${P.t}" y2="${H - P.b}" stroke="var(--text-3)" stroke-width="1" opacity="0"/>
+    </svg>`;
+
+  leg.innerHTML = syms.map((s, k) =>
+    `<span><i style="background:${css(S[k % 8])}"></i>${s}</span>`).join('');
+
+  // Capa de hover: obligatoria en linea/area.
+  const svg = cont.querySelector('svg'), cross = svg.querySelector('#cross'), tip = document.getElementById('tip');
+  svg.querySelector('#cap').addEventListener('mousemove', e => {
+    const r = svg.getBoundingClientRect(), x = (e.clientX - r.left) / r.width * W;
+    const i = Math.max(0, Math.min(n - 1, Math.round((x - P.l) / (W - P.l - P.r) * (n - 1))));
+    cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('opacity', '.45');
+    tip.innerHTML = `<div style="color:var(--text-3);margin-bottom:5px">${fechas[i]}</div>` +
+      syms.map((s, k) => {
+        const p = norm[s][i];
+        const crudo = series[s][i];
+        return `<div style="display:flex;gap:9px;justify-content:space-between">
+          <span style="color:${css(S[k % 8])}">■</span><span style="flex:1">${s}</span>
+          <strong>${p ? fmt(p[1], 1) : '—'}</strong>
+          <span style="color:var(--text-3)">${crudo ? precio(crudo[1]) : ''}</span></div>`;
+      }).join('');
+    tip.style.opacity = 1;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - 240) + 'px';
+    tip.style.top = (e.clientY - 12) + 'px';
+  });
+  svg.addEventListener('mouseleave', () => { tip.style.opacity = 0; cross.setAttribute('opacity', 0); });
+
+  // Vista de tabla: accesibilidad y el alivio del WARN de contraste.
+  const paso = Math.max(1, Math.floor(n / 14));
+  let t = `<table><thead><tr><th>fecha</th>${syms.map(s => `<th>${s}</th>`).join('')}</tr></thead><tbody>`;
+  for (let i = 0; i < n; i += paso) {
+    t += `<tr><td>${fechas[i]}</td>${syms.map(s => {
+      const p = (series[s] || [])[i];
+      return `<td>${p ? fmt(p[1], 3) : '—'}</td>`;
+    }).join('')}</tr>`;
+  }
+  document.getElementById('tabla-cmp').innerHTML = t + '</tbody></table>';
+}
+
+function detalle(sym, datos, st) {
+  const i = INSTR.find(x => x.symbol === sym) || {};
+  document.getElementById('t-stats').textContent = `${sym} — ${i.name || ''}`;
+  document.getElementById('n-stats').textContent =
+    `${st.bars} velas · ${st.from} → ${st.to}${i.unit ? ' · ' + i.unit : ''}`;
+
+  const tiles = [
+    ['último', precio(i.last)],
+    ['mínimo', precio(st.min)],
+    ['máximo', precio(st.max)],
+    ['promedio', precio(st.avg)],
+    ['volatilidad anual', st.annualized_vol_pct == null ? '—' : fmt(st.annualized_vol_pct, 1) + '%'],
+  ];
+  document.getElementById('tiles').innerHTML = tiles.map(([k, v]) =>
+    `<div class="tile"><div class="k">${k}</div><div class="v">${v}</div></div>`).join('');
+
+  if (datos.length < 2) { document.getElementById('precio').innerHTML = ''; return; }
+  const W = 980, H = 190, P = { t: 10, r: 12, b: 24, l: 46 };
+  const vs = datos.map(d => d[1]);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  const pad = (hi - lo) * .1 || 1; lo -= pad; hi += pad;
+  const X = k => P.l + k / (datos.length - 1) * (W - P.l - P.r);
+  const Y = v => P.t + (1 - (v - lo) / (hi - lo)) * (H - P.t - P.b);
+  let g = '';
+  for (let k = 0; k <= 3; k++) {
+    const v = lo + (hi - lo) * k / 3, y = Y(v);
+    g += `<line class="gridline" x1="${P.l}" y1="${y}" x2="${W - P.r}" y2="${y}"/>
+          <text class="axis" x="${P.l - 8}" y="${y + 3.5}" text-anchor="end">${precio(v)}</text>`;
+  }
+  const c = css('--s1');
+  const linea = datos.map(([, v], k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)} ${Y(v).toFixed(1)}`).join(' ');
+  const area = `${linea} L${X(datos.length - 1)} ${H - P.b} L${P.l} ${H - P.b} Z`;
+  g += `<path d="${area}" fill="${c}" opacity=".08"/>
+        <path d="${linea}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/>`;
+  [0, datos.length - 1].forEach(k =>
+    g += `<text class="axis" x="${X(k)}" y="${H - 6}" text-anchor="${k ? 'end' : 'start'}">${datos[k][0]}</text>`);
+  document.getElementById('precio').innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Precio de ${sym}">${g}</svg>`;
+}
+
+/* Matriz de correlacion — escala DIVERGENTE (azul ↔ rojo, gris en el medio).
+   Es polaridad: -1 y +1 son opuestos y el 0 es "nada". Una escala secuencial aca
+   mentiria, porque pintaria -1 y 0 como si fueran vecinos. */
+function correlacion(data) {
+  const syms = data.symbols, m = {};
+  data.matrix.forEach(x => { m[x.a + '|' + x.b] = x.r; });
+  const cel = 46, izq = 108, arr = 26;
+  const W = izq + cel * syms.length + 10, H = arr + cel * syms.length + 6;
+  let g = '';
+  syms.forEach((s, j) =>
+    g += `<text class="axis" x="${izq + cel * j + cel / 2}" y="${arr - 9}" text-anchor="middle">${s.slice(0, 7)}</text>`);
+  syms.forEach((a, i) => {
+    g += `<text class="axis" x="${izq - 8}" y="${arr + cel * i + cel / 2 + 3.5}" text-anchor="end">${a.slice(0, 14)}</text>`;
+    syms.forEach((b, j) => {
+      const r = m[a + '|' + b];
+      const x = izq + cel * j, y = arr + cel * i;
+      let bg = 'var(--surface-2)', ink = 'var(--text-3)';
+      if (r != null) {
+        // Dos polos + gris neutro. La opacidad codifica la magnitud.
+        bg = r >= 0 ? css('--s1') : css('--s8');
+        ink = Math.abs(r) > .55 ? '#fff' : 'var(--text-1)';
+      }
+      g += `<rect x="${x + 1}" y="${y + 1}" width="${cel - 2}" height="${cel - 2}" rx="5"
+              fill="${bg}" opacity="${r == null ? 1 : (.12 + Math.abs(r) * .8).toFixed(2)}"/>
+            <text x="${x + cel / 2}" y="${y + cel / 2 + 4}" text-anchor="middle"
+              font-size="11.5" font-weight="500" fill="${ink}">${r == null ? '—' : r.toFixed(2)}</text>`;
+    });
+  });
+  document.getElementById('corr').innerHTML =
+    `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}"
+       style="width:${W}px;max-width:100%;height:auto"
+       role="img" aria-label="Matriz de correlación de retornos diarios">${g}</svg></div>
+     <div class="legend"><span><i style="background:${css('--s1')}"></i>se mueven juntos (+)</span>
+       <span><i style="background:${css('--s8')}"></i>se mueven al revés (−)</span>
+       <span><i style="background:var(--surface-2)"></i>sin relación (0)</span></div>`;
+}
+
+init();
+</script>

@@ -3,7 +3,7 @@ name = "crucible"
 version = "0.1.0"
 description = "Plataforma local-first de riesgo de costo de insumos metalicos"
 requires-python = ">=3.12"
-dependencies = ["psycopg[binary]"]
+dependencies = ["psycopg[binary]", "fastapi", "uvicorn[standard]"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
