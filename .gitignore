@@ -3,3 +3,7 @@
 __pycache__/
 *.pyc
 data/
+
+# Vercel CLI link and the OIDC token it writes
+.vercel
+.env.local
