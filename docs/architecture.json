@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "feedstock — Local-First Input-Cost Risk for a Metals Plant",
+    "locale": "en",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "ingest", "label": "Ingest ten years", "focus": ["yahoo", "instruments", "ingest", "units", "db"], "note": "12 instruments, 30,302 daily bars, with every unit conversion written out." },
+      { "id": "unit-cost", "label": "Your unit cost", "focus": ["features", "basket", "api", "dashboard"], "note": "Define the real mix and the dashboard stops showing generic prices." },
+      { "id": "guards", "label": "The guards", "focus": ["instruments", "quality", "leakcheck"], "note": "Each one exists because something silently wrong got through once." }
+    ]
+  },
+  "components": [
+    { "id": "instruments", "type": "security", "label": "Instrument Registry", "sublabel": "names vs source reply",  "pos": [302, 100],  "size": [142, 52] },
+    { "id": "quality",     "type": "security", "label": "Quality Monitor",     "sublabel": "gaps · staleness",       "pos": [826, 100],  "size": [142, 52] },
+    { "id": "leakcheck",   "type": "security", "label": "Leakage Guard",       "sublabel": "runs in CI",             "pos": [1088, 100], "size": [142, 52] },
+    { "id": "yahoo",       "type": "external", "label": "Price Source",        "sublabel": "the one outbound call",  "pos": [40, 226],   "size": [142, 52] },
+    { "id": "ingest",      "type": "backend",  "label": "Ingestion",           "sublabel": "10-year backfill",       "pos": [302, 226],  "size": [142, 52] },
+    { "id": "units",       "type": "backend",  "label": "Unit Conversion",     "sublabel": "explicit, fails loudly", "pos": [564, 226],  "size": [142, 52] },
+    { "id": "db",          "type": "database", "label": "TimescaleDB",         "sublabel": "30,302 daily bars",      "pos": [826, 226],  "size": [142, 52] },
+    { "id": "features",    "type": "backend",  "label": "Feature Derivation",  "sublabel": "bands + outcomes",       "pos": [1088, 226], "size": [142, 52] },
+    { "id": "basket",      "type": "backend",  "label": "Cost Basket",         "sublabel": "your mix, your cost",    "pos": [826, 352],  "size": [142, 52] },
+    { "id": "signals",     "type": "backend",  "label": "Buy Signal",          "sublabel": "walk-forward backtest",  "pos": [1088, 352], "size": [142, 52] },
+    { "id": "dashboard",   "type": "frontend", "label": "Dashboard",           "sublabel": "no front-end deps",      "pos": [564, 478],  "size": [142, 52] },
+    { "id": "api",         "type": "backend",  "label": "FastAPI",             "sublabel": "serves it locally",      "pos": [826, 478],  "size": [142, 52] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Runs inside the plant", "wraps": ["instruments", "quality", "leakcheck", "ingest", "units", "db", "features", "basket", "signals", "dashboard", "api"], "pad": 26 }
+  ],
+  "connections": [
+    { "from": "yahoo",       "to": "ingest",    "label": "daily bars" },
+    { "from": "instruments", "to": "ingest",    "label": "verified names",   "variant": "security", "labelAt": [373, 189] },
+    { "from": "ingest",      "to": "units",     "label": "raw prices" },
+    { "from": "units",       "to": "db",        "label": "normalised",       "variant": "emphasis" },
+    { "from": "db",          "to": "features",  "label": "10y history",      "variant": "emphasis" },
+    { "from": "db",          "to": "quality",   "label": "gaps + staleness", "labelAt": [897, 189] },
+    { "from": "features",    "to": "leakcheck", "label": "guarded in CI",    "variant": "security", "labelAt": [1159, 189] },
+    { "from": "features",    "to": "signals",   "label": "bands",            "labelAt": [1159, 315] },
+    { "from": "features",    "to": "basket",    "label": "prices per unit" },
+    { "from": "basket",      "to": "api",       "label": "unit cost",        "variant": "emphasis", "labelAt": [897, 441] },
+    { "from": "signals",     "to": "api",       "label": "edge vs baseline", "toSide": "right" },
+    { "from": "api",         "to": "dashboard", "label": "served locally",   "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Units fail loudly", "items": ["An implicit kg-to-lb conversion gives a cost 2.2x wrong and raises no error", "The troy ounce (31.1 g) is kept separate from the common one (28.35 g)", "Confusing those two puts a 10% error into gold and silver"] },
+    { "dot": "rose", "title": "One ticker was not what it said", "items": ["The registry verifies display names against the source's own response", "A ticker trusted as zinc turned out to be a 10-year Treasury note future", "Nothing in the output would have told me — hence a check, not a convention"] },
+    { "dot": "emerald", "title": "What it does not claim", "items": ["Not a trading bot: it does not promise to beat the market", "The only claim is each model's out-of-sample error against a naive baseline", "Measured over 10 years, intuition does not hold — on several instruments it is inverted"] }
+  ]
+}
